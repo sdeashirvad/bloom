@@ -109,7 +109,13 @@ function MilestoneMarker({ milestone }: { milestone: Milestone }) {
 
 function CaptureCTA({ onPress }: { onPress: () => void }) {
   return (
-    <TouchableOpacity style={styles.captureCTA} onPress={onPress} activeOpacity={0.82}>
+    <TouchableOpacity
+      style={styles.captureCTA}
+      onPress={onPress}
+      activeOpacity={0.82}
+      accessibilityRole="button"
+      accessibilityLabel="Capture a moment — open mood check-in"
+    >
       <View style={styles.captureCTAInner}>
         <View style={styles.captureCTAIcon}>
           <Ionicons name="add" size={18} color={Colors.primary} />

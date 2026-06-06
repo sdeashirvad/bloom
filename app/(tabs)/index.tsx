@@ -333,6 +333,8 @@ export default function HomeScreen() {
               style={styles.quickCard}
               onPress={() => router.push('/(tabs)/week')}
               activeOpacity={0.82}
+              accessibilityRole="button"
+              accessibilityLabel="This week — baby and your body"
             >
               <LinearGradient colors={['#F0EBF8', '#E8E0F5']} style={styles.quickGradient}>
                 <View style={[styles.quickIconWrap, { backgroundColor: Colors.lavenderLight }]}>
@@ -346,6 +348,8 @@ export default function HomeScreen() {
               style={styles.quickCard}
               onPress={() => router.push('/(tabs)/mood')}
               activeOpacity={0.82}
+              accessibilityRole="button"
+              accessibilityLabel="Mood check — how are you today?"
             >
               <LinearGradient colors={['#FDF0EA', '#F8E5D8']} style={styles.quickGradient}>
                 <View style={[styles.quickIconWrap, { backgroundColor: Colors.peachLight }]}>

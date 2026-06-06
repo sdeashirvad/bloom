@@ -1,0 +1,1 @@
+- [Expo Router splash + navigation gate pattern](expo-router-splash-nav-gate.md) — never return null from a component that siblings a Stack; use a SplashController inside the provider instead.

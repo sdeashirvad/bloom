@@ -269,6 +269,8 @@ export default function SettingsScreen() {
               setShowModal(true);
             }}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Clear my journey — removes all data from this device"
           >
             <View style={styles.clearButtonInner}>
               <View style={styles.clearButtonIconWrap}>

@@ -123,7 +123,13 @@ function StoryStep({
         ) : null}
       </View>
 
-      <TouchableOpacity style={styles.primaryButton} onPress={onNext} activeOpacity={0.85}>
+      <TouchableOpacity
+        style={styles.primaryButton}
+        onPress={onNext}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel={ctaLabel}
+      >
         <Text style={styles.primaryButtonText}>{ctaLabel}</Text>
       </TouchableOpacity>
     </View>
@@ -135,15 +141,22 @@ function StoryStep({
 function NameStep({ onNext }: { onNext: () => void }) {
   const [name, setName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isMounted = useRef(true);
   const { updateUser } = useBloom();
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
 
   async function handleNext() {
     if (!name.trim() || isSubmitting) return;
     setIsSubmitting(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await updateUser({ name: name.trim() });
-    onNext();
-    setIsSubmitting(false);
+    // onNext may advance the step and unmount this component —
+    // never call setState after this point.
+    if (isMounted.current) onNext();
   }
 
   return (
@@ -162,12 +175,16 @@ function NameStep({ onNext }: { onNext: () => void }) {
         autoFocus
         returnKeyType="done"
         onSubmitEditing={handleNext}
+        accessibilityLabel="Enter your name"
       />
       <TouchableOpacity
         style={[styles.primaryButton, (!name.trim() || isSubmitting) && styles.primaryButtonDisabled]}
         onPress={handleNext}
         activeOpacity={0.85}
         disabled={!name.trim() || isSubmitting}
+        accessibilityRole="button"
+        accessibilityLabel="Continue"
+        accessibilityState={{ disabled: !name.trim() || isSubmitting }}
       >
         <Text style={styles.primaryButtonText}>Continue</Text>
       </TouchableOpacity>
@@ -280,6 +297,9 @@ function LMPStep({ onNext }: { onNext: () => void }) {
         onPress={handleNext}
         activeOpacity={0.85}
         disabled={!canContinue}
+        accessibilityRole="button"
+        accessibilityLabel="Continue"
+        accessibilityState={{ disabled: !canContinue }}
       >
         <Text style={styles.primaryButtonText}>Continue</Text>
       </TouchableOpacity>
@@ -316,6 +336,9 @@ function FirstPregnancyStep({ onComplete }: { onComplete: (value: boolean) => vo
           onPress={() => handleSelect(true)}
           activeOpacity={0.85}
           disabled={isSubmitting}
+          accessibilityRole="button"
+          accessibilityLabel="Yes, this is my first pregnancy"
+          accessibilityState={{ selected: selected === true, disabled: isSubmitting }}
         >
           <Text style={[styles.choiceText, selected === true && styles.choiceTextSelected]}>
             Yes, it is
@@ -326,6 +349,9 @@ function FirstPregnancyStep({ onComplete }: { onComplete: (value: boolean) => vo
           onPress={() => handleSelect(false)}
           activeOpacity={0.85}
           disabled={isSubmitting}
+          accessibilityRole="button"
+          accessibilityLabel="I've been pregnant before"
+          accessibilityState={{ selected: selected === false, disabled: isSubmitting }}
         >
           <Text style={[styles.choiceText, selected === false && styles.choiceTextSelected]}>
             I've been here before
@@ -450,6 +476,9 @@ function BloomCompletionStep({
           onPress={handleComplete}
           activeOpacity={0.85}
           disabled={isSubmitting}
+          accessibilityRole="button"
+          accessibilityLabel="Enter Bloom"
+          accessibilityState={{ disabled: isSubmitting }}
         >
           <Text style={styles.primaryButtonText}>Enter Bloom</Text>
         </TouchableOpacity>

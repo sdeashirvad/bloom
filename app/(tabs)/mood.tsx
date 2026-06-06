@@ -194,6 +194,9 @@ function ReflectionPromptStep({
         onPress={onSave}
         activeOpacity={0.85}
         disabled={isSaving}
+        accessibilityRole="button"
+        accessibilityLabel={reflectionText.trim() ? 'Save reflection' : 'Continue without writing'}
+        accessibilityState={{ disabled: isSaving }}
       >
         <Text style={styles.primaryButtonText}>
           {reflectionText.trim() ? 'Save reflection' : 'Continue'}
@@ -206,6 +209,9 @@ function ReflectionPromptStep({
         onPress={onSkip}
         activeOpacity={0.7}
         disabled={isSaving}
+        accessibilityRole="button"
+        accessibilityLabel="Skip for today"
+        accessibilityState={{ disabled: isSaving }}
       >
         <Text style={styles.skipText}>Skip for today</Text>
       </TouchableOpacity>
@@ -253,7 +259,13 @@ function ReflectionResponseStep({
         </View>
       </View>
 
-      <TouchableOpacity onPress={onReset} style={styles.resetBtn} activeOpacity={0.7}>
+      <TouchableOpacity
+        onPress={onReset}
+        style={styles.resetBtn}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Reflect again"
+      >
         <Ionicons name="refresh-outline" size={15} color={Colors.textSoft} />
         <Text style={styles.resetText}>Reflect again</Text>
       </TouchableOpacity>
