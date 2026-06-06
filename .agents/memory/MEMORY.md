@@ -1,1 +1,3 @@
 - [Expo Router splash + navigation gate pattern](expo-router-splash-nav-gate.md) — never return null from a component that siblings a Stack; use a SplashController inside the provider instead.
+- [Bloom motion system](bloom-motion-system.md) — standardized spring to damping:24, stiffness:88 (slightly overdamped, no bounce) across all slides/entrances.
+- [Bloom haptic design](bloom-haptic-design.md) — mood selection: Light impact; save reflection: NotificationFeedbackType.Success; skip/clear: Light impact.

@@ -21,8 +21,8 @@ export function MoodButton({ label, icon, isSelected, onPress, color, delay = 0 
   useEffect(() => {
     const timeout = setTimeout(() => {
       Animated.parallel([
-        Animated.timing(entranceAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
-        Animated.spring(entranceSlide, { toValue: 0, damping: 16, useNativeDriver: true }),
+        Animated.timing(entranceAnim, { toValue: 1, duration: 440, useNativeDriver: true }),
+        Animated.spring(entranceSlide, { toValue: 0, damping: 22, stiffness: 88, useNativeDriver: true }),
       ]).start();
     }, delay);
     return () => clearTimeout(timeout);
@@ -37,10 +37,10 @@ export function MoodButton({ label, icon, isSelected, onPress, color, delay = 0 
   }, [isSelected]);
 
   function handlePress() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Animated.sequence([
       Animated.spring(scale, {
-        toValue: 0.90,
+        toValue: 0.91,
         useNativeDriver: true,
         speed: 80,
         bounciness: 0,
@@ -48,8 +48,8 @@ export function MoodButton({ label, icon, isSelected, onPress, color, delay = 0 
       Animated.spring(scale, {
         toValue: 1,
         useNativeDriver: true,
-        speed: 25,
-        bounciness: 8,
+        speed: 24,
+        bounciness: 4,
       }),
     ]).start();
     onPress();
@@ -83,6 +83,9 @@ export function MoodButton({ label, icon, isSelected, onPress, color, delay = 0 
           },
         ]}
         activeOpacity={0.9}
+        accessibilityRole="button"
+        accessibilityLabel={`${label} — select mood`}
+        accessibilityState={{ selected: isSelected }}
       >
         <View style={styles.inner}>
           <Text style={styles.icon}>{icon}</Text>

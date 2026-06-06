@@ -173,7 +173,7 @@ export default function SettingsScreen() {
           style={{ opacity: headerFade, transform: [{ translateY: headerSlide }] }}
         >
           <Text style={styles.eyebrow}>Your sanctuary</Text>
-          <Text style={styles.pageTitle}>Your space</Text>
+          <Text style={styles.pageTitle}>Sanctuary</Text>
           <Text style={styles.pageSubtitle}>
             Bloom lives entirely on your device.{'\n'}Quiet, private, and always yours.
           </Text>

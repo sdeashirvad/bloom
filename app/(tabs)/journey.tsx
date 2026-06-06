@@ -49,8 +49,8 @@ function EmptyState({ onCapture }: { onCapture: () => void }) {
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 560, useNativeDriver: true }),
+      Animated.spring(slideAnim, { toValue: 0, damping: 24, stiffness: 88, useNativeDriver: true }),
     ]).start();
   }, []);
 
@@ -149,8 +149,8 @@ export default function JourneyScreen() {
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(headerFade, { toValue: 1, duration: 640, useNativeDriver: true }),
-      Animated.timing(headerSlide, { toValue: 0, duration: 640, useNativeDriver: true }),
+      Animated.timing(headerFade, { toValue: 1, duration: 600, useNativeDriver: true }),
+      Animated.spring(headerSlide, { toValue: 0, damping: 24, stiffness: 88, useNativeDriver: true }),
     ]).start();
     loadReflections();
   }, []);

@@ -14,30 +14,38 @@ export function SupportCard({ title, message, color, gradient }: Props) {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(24)).current;
   const scale = useRef(new Animated.Value(0.96)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     opacity.setValue(0);
     translateY.setValue(24);
     scale.setValue(0.96);
+    glowAnim.setValue(0);
 
     Animated.parallel([
       Animated.timing(opacity, {
         toValue: 1,
-        duration: 450,
+        duration: 480,
         useNativeDriver: true,
       }),
       Animated.spring(translateY, {
         toValue: 0,
-        damping: 18,
-        stiffness: 120,
+        damping: 22,
+        stiffness: 90,
         useNativeDriver: true,
       }),
       Animated.spring(scale, {
         toValue: 1,
-        damping: 16,
-        stiffness: 110,
+        damping: 22,
+        stiffness: 90,
         useNativeDriver: true,
       }),
+    ]).start();
+
+    // Single glow breath — the "moment held" delight
+    Animated.sequence([
+      Animated.timing(glowAnim, { toValue: 1, duration: 900, delay: 380, useNativeDriver: true }),
+      Animated.timing(glowAnim, { toValue: 0, duration: 1400, useNativeDriver: true }),
     ]).start();
   }, [title]);
 
@@ -54,6 +62,20 @@ export function SupportCard({ title, message, color, gradient }: Props) {
         end={{ x: 1, y: 1 }}
         style={styles.card}
       >
+        {/* Glow overlay — single warm breath after reflection is saved */}
+        <Animated.View
+          style={[
+            styles.glowOverlay,
+            {
+              backgroundColor: color,
+              opacity: glowAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 0.09],
+              }),
+            },
+          ]}
+        />
+
         {/* Color accent bar */}
         <View style={[styles.accentBar, { backgroundColor: color }]} />
 
@@ -113,6 +135,14 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     lineHeight: 24,
     fontFamily: 'Inter_400Regular',
+  },
+  glowOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: Colors.radius.xl,
   },
   decorOrb: {
     position: 'absolute',

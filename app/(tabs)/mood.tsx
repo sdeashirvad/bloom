@@ -91,7 +91,7 @@ function MoodSelectStep({
   return (
     <>
       <Animated.View style={{ opacity: headerFade, transform: [{ translateY: headerSlide }] }}>
-        <Text style={styles.eyebrow}>Daily reflection</Text>
+        <Text style={styles.eyebrow}>A moment for you</Text>
         <Text style={styles.pageTitle}>How are you{'\n'}feeling?</Text>
         <Text style={styles.subtitle}>{nameGreeting}</Text>
       </Animated.View>
@@ -154,8 +154,8 @@ function ReflectionPromptStep({
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.spring(slideAnim, { toValue: 0, damping: 22, stiffness: 100, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 480, useNativeDriver: true }),
+      Animated.spring(slideAnim, { toValue: 0, damping: 24, stiffness: 88, useNativeDriver: true }),
     ]).start();
   }, []);
 
@@ -172,7 +172,7 @@ function ReflectionPromptStep({
       {/* Prompt */}
       <Text style={styles.promptTitle}>{prompt}</Text>
       <Text style={styles.promptSubtitle}>
-        Write a few words, if you'd like. There's no pressure here.
+        No rush. Write what's here, or leave it — both are fine.
       </Text>
 
       {/* Optional text input */}
@@ -292,8 +292,8 @@ export default function MoodScreen() {
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(headerFade, { toValue: 1, duration: 680, useNativeDriver: true }),
-      Animated.spring(headerSlide, { toValue: 0, damping: 22, stiffness: 100, useNativeDriver: true }),
+      Animated.timing(headerFade, { toValue: 1, duration: 640, useNativeDriver: true }),
+      Animated.spring(headerSlide, { toValue: 0, damping: 24, stiffness: 88, useNativeDriver: true }),
     ]).start();
 
     // Restore today's reflection if it exists
@@ -323,13 +323,13 @@ export default function MoodScreen() {
     setSelectedMood(mood);
     setReflectionText('');
     setFlowStep('prompt');
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
 
   async function handleSave() {
     if (!selectedMood || isSaving) return;
     setIsSaving(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     const moodResponse = getMoodResponse(selectedMood as MoodKey, week + promptSeed);
     const entry: ReflectionEntry = {

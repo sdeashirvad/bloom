@@ -54,8 +54,8 @@ function InfoSection({ icon, iconBg, iconColor, label, title, body, delay = 0 }:
   useEffect(() => {
     const timeout = setTimeout(() => {
       Animated.parallel([
-        Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
-        Animated.spring(slideAnim, { toValue: 0, damping: 20, stiffness: 100, useNativeDriver: true }),
+        Animated.timing(fadeAnim, { toValue: 1, duration: 480, useNativeDriver: true }),
+        Animated.spring(slideAnim, { toValue: 0, damping: 24, stiffness: 88, useNativeDriver: true }),
       ]).start();
     }, delay);
     return () => clearTimeout(timeout);
@@ -94,8 +94,8 @@ export default function WeekScreen() {
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(headerFade, { toValue: 1, duration: 640, useNativeDriver: true }),
-      Animated.spring(headerSlide, { toValue: 0, damping: 22, stiffness: 100, useNativeDriver: true }),
+      Animated.timing(headerFade, { toValue: 1, duration: 600, useNativeDriver: true }),
+      Animated.spring(headerSlide, { toValue: 0, damping: 24, stiffness: 88, useNativeDriver: true }),
     ]).start();
   }, []);
 

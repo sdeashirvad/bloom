@@ -72,7 +72,7 @@ export function AmbientOrb({
   });
   const scale = pulseAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [1, 1.1],
+    outputRange: [1, 1.06],
   });
 
   return (

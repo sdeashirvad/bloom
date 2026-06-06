@@ -467,3 +467,48 @@ export const MOOD_CHECKIN_AFFIRMATIONS = [
 export function getDailyCheckinAffirmation(): string {
   return MOOD_CHECKIN_AFFIRMATIONS[new Date().getDay() % MOOD_CHECKIN_AFFIRMATIONS.length];
 }
+
+// ─── Companion notes (trimester-aware, shown on home screen) ──────────────────
+
+const COMPANION_NOTES: Record<1 | 2 | 3, string[]> = {
+  1: [
+    'Your body is doing invisible, extraordinary work right now.',
+    'The earliest weeks are often the quietest — and somehow the most profound.',
+    'Fatigue in early pregnancy is your body asking for what it truly needs.',
+    'Right now, something is growing that didn\'t exist before. That deserves to be witnessed.',
+    'The first trimester can feel lonely when so much is kept close. You\'re not alone.',
+    'Even when pregnancy is all you can think about, your pace can be different from the world\'s.',
+    'Morning sickness, if you have it, is one of the most concrete signs of how hard your body is working.',
+    'Every day of the first trimester is a quiet act of faith.',
+  ],
+  2: [
+    'The second trimester often brings a return of energy — receive it gently.',
+    'Your baby can now hear the rhythm of your heartbeat, always.',
+    'Your experience of this pregnancy is yours to define, however you choose.',
+    'Those first flutters of movement — when they come — are unlike anything else.',
+    'You might feel closer to your baby this week than you expected. That\'s real.',
+    'Your center of gravity is shifting. Be patient with your body as it adjusts.',
+    'Halfway through is also halfway toward something remarkable.',
+    'Your baby can now distinguish light from dark. They\'re already curious.',
+    'Some weeks feel quieter than others. That\'s allowed too.',
+    'The anatomy scan can bring a flood of feelings — every single one is valid.',
+  ],
+  3: [
+    'The final stretch carries its own particular weight — and its own beauty.',
+    'Your baby is putting on weight, gaining the softness you\'ll hold soon.',
+    'Rest however you can, whenever you can. It counts.',
+    'Your body is ancient wisdom in motion. It knows what it\'s doing.',
+    'Every day now is a day closer to the one that changes everything.',
+    'Your baby knows your voice. They\'ve been listening for weeks.',
+    'This kind of waiting is unlike any other. It has its own strange, tender gravity.',
+    'Nesting, resting, preparing — all of it is a form of love.',
+    'You are further along than you think, and closer than it feels. Both are true.',
+  ],
+};
+
+export function getCompanionNote(week: number): string {
+  const trimester = getTrimester(week);
+  const pool = COMPANION_NOTES[trimester];
+  const seed = week + new Date().getDate() + new Date().getMonth() * 3;
+  return pool[seed % pool.length];
+}

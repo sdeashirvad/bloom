@@ -25,6 +25,7 @@ import {
   GREETING_BY_TIME,
   getPersonalMemory,
   getTrimester,
+  getCompanionNote,
 } from '@/constants/emotionalContent';
 import {
   getTimeOfDay,
@@ -192,6 +193,7 @@ export default function HomeScreen() {
   const week = pregnancyWeek || 18;
   const weekData = getWeekData(week);
   const affirmation = getDailyAffirmation(week);
+  const companionNote = getCompanionNote(week);
   const greeting = GREETING_BY_TIME();
   const trimester = getTrimester(week);
   const timeOfDay = getTimeOfDay();
@@ -284,8 +286,16 @@ export default function HomeScreen() {
           </View>
         </StaggeredCard>
 
+        {/* Companion note — trimester-aware, rotating */}
+        <StaggeredCard delay={330}>
+          <LinearGradient colors={['#FDF5EE', '#F8EDE0']} style={styles.companionNote}>
+            <Text style={styles.companionMark}>✦</Text>
+            <Text style={styles.companionText}>{companionNote}</Text>
+          </LinearGradient>
+        </StaggeredCard>
+
         {/* Emotional note */}
-        <StaggeredCard delay={360}>
+        <StaggeredCard delay={380}>
           <LinearGradient colors={['#FDF5EE', '#F8EAE0']} style={styles.emotionalNote}>
             <View style={styles.emotionalNoteDecor} />
             <Text style={styles.emotionalNoteText}>{weekData.emotionalNote}</Text>
@@ -327,7 +337,7 @@ export default function HomeScreen() {
 
         {/* Explore */}
         <StaggeredCard delay={640}>
-          <Text style={[styles.sectionTitle, { marginTop: 8 }]}>Explore</Text>
+          <Text style={[styles.sectionTitle, { marginTop: 8 }]}>Just for you</Text>
           <View style={styles.quickRow}>
             <TouchableOpacity
               style={styles.quickCard}
@@ -617,6 +627,33 @@ const styles = StyleSheet.create({
     color: Colors.textWarm,
     lineHeight: 23,
     fontFamily: 'Inter_400Regular',
+  },
+
+  companionNote: {
+    borderRadius: Colors.radius.xl,
+    paddingVertical: 22,
+    paddingHorizontal: 24,
+    marginBottom: 14,
+    overflow: 'hidden',
+    flexDirection: 'row',
+    gap: 14,
+    alignItems: 'flex-start',
+  },
+  companionMark: {
+    fontSize: 13,
+    color: Colors.primarySoft,
+    lineHeight: 28,
+    marginTop: 3,
+    flexShrink: 0,
+  },
+  companionText: {
+    flex: 1,
+    fontSize: 17,
+    color: Colors.textWarm,
+    fontFamily: 'CormorantGaramond_400Regular',
+    lineHeight: 26,
+    letterSpacing: -0.1,
+    fontStyle: 'italic',
   },
 
   quickRow: { flexDirection: 'row', gap: 12 },
