@@ -39,3 +39,34 @@ export async function hasCheckedInToday(): Promise<boolean> {
   const entry = await getTodaysReflection();
   return entry !== null;
 }
+
+export type ReflectionGroup = {
+  key: string;
+  label: string;
+  entries: ReflectionEntry[];
+};
+
+export function groupReflectionsByMonth(entries: ReflectionEntry[]): ReflectionGroup[] {
+  const groupMap = new Map<string, ReflectionEntry[]>();
+  for (const entry of entries) {
+    const date = new Date(entry.createdAt);
+    const key = `${date.getFullYear()}-${String(date.getMonth()).padStart(2, '0')}`;
+    if (!groupMap.has(key)) groupMap.set(key, []);
+    groupMap.get(key)!.push(entry);
+  }
+  return Array.from(groupMap.entries()).map(([key, grpEntries]) => {
+    const date = new Date(grpEntries[0].createdAt);
+    const label = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    return { key, label, entries: grpEntries };
+  });
+}
+
+export async function getReflectionCount(): Promise<number> {
+  const all = await getAllReflections();
+  return all.length;
+}
+
+export async function getReflectionsByWeek(week: number): Promise<ReflectionEntry[]> {
+  const all = await getAllReflections();
+  return all.filter((e) => e.pregnancyWeek === week);
+}

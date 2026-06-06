@@ -17,6 +17,7 @@ import { Colors } from '@/constants/colors';
 import { AmbientOrb } from '@/components/AmbientOrb';
 import { useBloom } from '@/context/BloomContext';
 import { getTrimester } from '@/constants/emotionalContent';
+import { getReflectionCount } from '@/stores/reflectionStore';
 
 const TRIMESTER_NOTES: Record<1 | 2 | 3, string> = {
   1: 'First trimester — the quiet beginning.',
@@ -101,6 +102,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { user, pregnancyWeek, clearJourney } = useBloom();
   const [showModal, setShowModal] = useState(false);
+  const [reflectionCount, setReflectionCount] = useState<number | null>(null);
 
   const headerFade = useRef(new Animated.Value(0)).current;
   const headerSlide = useRef(new Animated.Value(22)).current;
@@ -110,6 +112,7 @@ export default function SettingsScreen() {
   const card2Slide = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
+    getReflectionCount().then(setReflectionCount);
     Animated.parallel([
       Animated.timing(headerFade, { toValue: 1, duration: 600, useNativeDriver: true }),
       Animated.spring(headerSlide, { toValue: 0, damping: 22, stiffness: 110, useNativeDriver: true }),
@@ -234,6 +237,18 @@ export default function SettingsScreen() {
               </Text>
               <Text style={styles.journeyWeek}>Week {pregnancyWeek}</Text>
               <Text style={styles.journeyNote}>{TRIMESTER_NOTES[trimester]}</Text>
+
+              {reflectionCount !== null && reflectionCount > 0 ? (
+                <View style={styles.journeySummary}>
+                  <View style={styles.journeySummaryDivider} />
+                  <Text style={styles.journeySummaryLabel}>Your journey so far</Text>
+                  <Text style={styles.journeySummaryValue}>
+                    {reflectionCount === 1
+                      ? '1 reflection shared'
+                      : `${reflectionCount} reflections shared`}
+                  </Text>
+                </View>
+              ) : null}
             </LinearGradient>
           </Animated.View>
         ) : null}
@@ -450,6 +465,28 @@ const styles = StyleSheet.create({
   journeyNote: {
     fontSize: 15,
     color: Colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontStyle: 'italic',
+  },
+  journeySummary: {
+    marginTop: 18,
+  },
+  journeySummaryDivider: {
+    height: 1,
+    backgroundColor: 'rgba(212,136,112,0.15)',
+    marginBottom: 14,
+  },
+  journeySummaryLabel: {
+    fontSize: 11,
+    color: Colors.textSoft,
+    fontFamily: 'Inter_600SemiBold',
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  journeySummaryValue: {
+    fontSize: 15,
+    color: Colors.textWarm,
     fontFamily: 'Inter_400Regular',
     fontStyle: 'italic',
   },

@@ -46,6 +46,14 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="journey"
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name={focused ? 'journal' : 'journal-outline'} focused={focused} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="week"
         options={{
           tabBarIcon: ({ focused }) => (
@@ -54,19 +62,17 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="mood"
+        name="settings"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon name={focused ? 'sunny' : 'sunny-outline'} focused={focused} />
+            <TabIcon name={focused ? 'moon' : 'moon-outline'} focused={focused} />
           ),
         }}
       />
       <Tabs.Screen
-        name="settings"
+        name="mood"
         options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon name={focused ? 'person-circle' : 'person-circle-outline'} focused={focused} />
-          ),
+          href: null,
         }}
       />
     </Tabs>

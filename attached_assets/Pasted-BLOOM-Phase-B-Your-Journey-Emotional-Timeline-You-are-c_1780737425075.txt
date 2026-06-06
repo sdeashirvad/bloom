@@ -1,0 +1,477 @@
+BLOOM — Phase B: “Your Journey” Emotional Timeline
+
+You are continuing development on Bloom, an offline-first emotional pregnancy companion app built with:
+
+- React Native 0.76
+- Expo 52
+- Expo Router
+- Zustand
+- AsyncStorage
+- Reanimated
+
+Bloom is intentionally:
+
+- emotionally calming
+- gentle
+- quiet
+- low-pressure
+- privacy-first
+- offline-only
+
+This is NOT:
+
+- a productivity app
+- a social app
+- a clinical tracker
+- a mental health analytics tool
+
+Every design and UX decision should feel:
+
+- warm
+- breathable
+- emotionally safe
+- spacious
+- human
+
+Avoid:
+
+- gamification
+- metrics
+- streak pressure
+- emotional scoring
+- charts/graphs
+- dense dashboards
+- productivity mechanics
+
+IMPORTANT:
+The app already has:
+
+- onboarding
+- pregnancy week system
+- mood check-in
+- unified ReflectionEntry architecture
+- local persistence
+
+Phase B now introduces:
+
+“Your Journey”
+
+This is the emotional memory layer of Bloom.
+
+---
+
+GOAL OF PHASE B
+
+Create a soft, beautiful emotional timeline where users can revisit:
+
+- reflections
+- moods
+- emotional moments
+- supportive Bloom responses
+- pregnancy memories
+
+This should feel like:
+"a gentle keepsake of the journey"
+
+NOT:
+"a history dashboard"
+
+---
+
+1. TAB STRUCTURE UPDATE
+
+---
+
+Current tabs:
+
+- Home
+- Week
+- Mood
+- Profile
+
+Update to:
+
+- Home
+- Journey
+- This Week
+- Sanctuary
+
+Rename:
+
+- Mood → Journey
+- Profile → Sanctuary
+
+Journey becomes the emotional memory space.
+
+Mood check-ins should still be accessible:
+
+- from Home
+- from Journey
+- or as CTA cards
+
+Mood no longer needs a permanent standalone tab.
+
+---
+
+2. CREATE JOURNEY SCREEN
+
+---
+
+Create:
+"app/(tabs)/journey.tsx"
+
+Purpose:
+Display emotional reflections chronologically.
+
+Structure should feel:
+
+- calm
+- spacious
+- scrollable
+- emotionally reflective
+
+Avoid:
+
+- dense feeds
+- social-feed feeling
+- analytics feeling
+
+---
+
+3. TIMELINE DESIGN REQUIREMENTS
+
+---
+
+Entries should appear as soft cards.
+
+Each card may contain:
+
+- mood
+- date
+- pregnancy week
+- optional reflection text
+- Bloom response
+
+---
+
+CARD EXAMPLES
+
+Example 1:
+
+Week 25 · Calm
+
+"Something settled today."
+
+Carry this calmness gently through your day.
+
+---
+
+Example 2:
+
+Week 18 · Emotional
+
+"I finally felt movement today."
+
+Bloom:
+What a beautiful moment to carry with you.
+
+---
+
+Example 3:
+
+Week 31 · Anxious
+
+"I've been feeling overwhelmed lately."
+
+Bloom:
+You are allowed to move slowly through difficult days.
+
+---
+
+4. GROUPING STYLE
+
+---
+
+Group entries softly by:
+
+- month
+  OR
+- pregnancy week ranges
+
+Examples:
+
+"Second Trimester"
+
+OR
+
+"June"
+
+DO NOT:
+
+- over-segment
+- create rigid date systems
+
+---
+
+5. EMPTY STATE
+
+---
+
+Very important emotionally.
+
+If no reflections exist:
+
+DO NOT use:
+"No entries found"
+
+Use:
+
+"Your reflections will gather here gently over time."
+
+Add a soft CTA:
+"Check in today"
+
+---
+
+6. JOURNEY SCREEN UX
+
+---
+
+The screen should feel:
+
+- emotionally warm
+- meditative
+- uncluttered
+
+Spacing should breathe.
+
+Cards should have:
+
+- rounded corners
+- subtle depth
+- low-contrast backgrounds
+- soft emotional color palette
+
+Use existing Bloom design system.
+
+---
+
+7. OPTIONAL MEMORY HIGHLIGHTS
+
+---
+
+Add lightweight milestone support.
+
+Examples:
+
+- "First trimester complete"
+- "Halfway there"
+- "Viability week"
+- "Due month approaching"
+
+These should appear rarely and gently.
+
+NOT:
+
+- achievements
+- badges
+- rewards
+
+Tone should feel reflective.
+
+---
+
+8. ADD "WRITE A FEW WORDS" ENTRY FLOW
+
+---
+
+From Journey screen:
+Add subtle CTA:
+
+"Capture a moment"
+
+This should open:
+
+- mood selection
+- optional reflection
+- Bloom response flow
+
+Reuse existing ReflectionEntry architecture.
+
+---
+
+9. IMPORTANT UX CONSTRAINTS
+
+---
+
+DO NOT ADD:
+
+- streaks
+- mood charts
+- graphs
+- percentages
+- emotional analytics
+- trend scoring
+- productivity framing
+- pushy reminders
+
+Bloom should NEVER feel like:
+a self-optimization tool.
+
+---
+
+10. MOTION + INTERACTION
+
+---
+
+Animations should feel:
+
+- slow
+- soft
+- breathing
+- calm
+
+Recommended:
+
+- fade transitions
+- subtle upward motion
+- opacity sequencing
+
+Avoid:
+
+- sharp springs
+- aggressive bounce
+- flashy movement
+
+---
+
+11. PERFORMANCE REQUIREMENTS
+
+---
+
+Journey screen may eventually contain:
+
+- months of entries
+
+Implement:
+
+- performant FlatList/FlashList usage
+- memoized cards where appropriate
+- lightweight rendering
+
+But preserve emotional softness.
+
+---
+
+12. DATA + STORAGE
+
+---
+
+Use existing:
+"ReflectionEntry"
+
+Required retrieval methods:
+
+- grouped timeline entries
+- latest reflections
+- reflections by week
+
+Keep architecture modular.
+
+---
+
+13. SANCTUARY SCREEN ENHANCEMENTS
+
+---
+
+Current profile screen already has:
+
+- privacy reassurance
+- local-only messaging
+- reset journey
+
+Enhance subtly with:
+
+Optional section:
+"Your journey so far"
+
+Examples:
+
+- Week 25
+- 18 reflections shared
+- Second trimester
+
+DO NOT:
+
+- make this analytical
+- add charts
+
+Tone:
+reflective, not quantified.
+
+---
+
+14. FUTURE-READY ARCHITECTURE
+
+---
+
+Prepare for future support of:
+
+- exported memory book
+- postpartum continuation
+- milestone memories
+- favorite reflections
+
+But do NOT fully build these now.
+
+---
+
+15. CODE QUALITY REQUIREMENTS
+
+---
+
+- Preserve existing Bloom aesthetic.
+- Avoid introducing heavy dependencies.
+- Keep offline-first architecture.
+- No backend.
+- No APIs.
+- No telemetry.
+- No analytics SDKs.
+
+Preserve:
+
+- typography rhythm
+- generous spacing
+- emotional tone
+- visual softness
+
+Do NOT redesign Bloom.
+
+Enhance:
+
+- emotional continuity
+- reflection depth
+- long-term attachment
+
+---
+
+16. EXPECTED OUTPUT
+
+---
+
+Implement:
+
+- Journey tab
+- emotional timeline UI
+- grouped reflections
+- empty states
+- memory cards
+- reusable timeline components
+- updated navigation structure
+
+Then provide:
+
+1. Summary of UX improvements
+2. Files added/modified
+3. Architectural notes
+4. Suggestions for future emotional continuity features
