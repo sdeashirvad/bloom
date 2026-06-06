@@ -17,6 +17,7 @@ import { Colors } from '@/constants/colors';
 import { ProgressDots } from '@/components/ProgressDots';
 import { BabyIllustration } from '@/components/BabyIllustration';
 import { useBloom } from '@/context/BloomContext';
+import { validateLMPDate, parseLMPFields } from '@/utils/pregnancyValidation';
 
 // Steps: 0,1,2 = story  |  3,4,5 = data  |  6 = bloom completion
 const DATA_STEPS = 3;
@@ -133,13 +134,16 @@ function StoryStep({
 
 function NameStep({ onNext }: { onNext: () => void }) {
   const [name, setName] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { updateUser } = useBloom();
 
   async function handleNext() {
-    if (!name.trim()) return;
+    if (!name.trim() || isSubmitting) return;
+    setIsSubmitting(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await updateUser({ name: name.trim() });
     onNext();
+    setIsSubmitting(false);
   }
 
   return (
@@ -160,10 +164,10 @@ function NameStep({ onNext }: { onNext: () => void }) {
         onSubmitEditing={handleNext}
       />
       <TouchableOpacity
-        style={[styles.primaryButton, !name.trim() && styles.primaryButtonDisabled]}
+        style={[styles.primaryButton, (!name.trim() || isSubmitting) && styles.primaryButtonDisabled]}
         onPress={handleNext}
         activeOpacity={0.85}
-        disabled={!name.trim()}
+        disabled={!name.trim() || isSubmitting}
       >
         <Text style={styles.primaryButtonText}>Continue</Text>
       </TouchableOpacity>
@@ -175,19 +179,32 @@ function LMPStep({ onNext }: { onNext: () => void }) {
   const [day, setDay] = useState('');
   const [month, setMonth] = useState('');
   const [year, setYear] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const monthRef = useRef<TextInput>(null);
   const yearRef = useRef<TextInput>(null);
   const { user, updateUser } = useBloom();
 
-  const isValid = day.length >= 1 && month.length >= 1 && year.length === 4;
+  const fieldsComplete = day.length >= 1 && month.length >= 1 && year.length === 4;
+
+  const parsedDate = fieldsComplete ? parseLMPFields(day, month, year) : null;
+  const validation = parsedDate ? validateLMPDate(parsedDate) : null;
+
+  const isBlocked = !fieldsComplete || !parsedDate || (validation?.blocking === true);
+  const canContinue = !isBlocked && !isSubmitting;
+
+  const helperText = validation?.warning ?? null;
+  const helperIsWarning = validation?.blocking === true;
 
   async function handleNext() {
-    if (!isValid) return;
+    if (!canContinue || !parsedDate) return;
+    setIsSubmitting(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const d = parseInt(day).toString().padStart(2, '0');
-    const m = parseInt(month).toString().padStart(2, '0');
-    await updateUser({ lmp: `${year}-${m}-${d}` });
+    const d = parsedDate.getDate().toString().padStart(2, '0');
+    const m = (parsedDate.getMonth() + 1).toString().padStart(2, '0');
+    const y = parsedDate.getFullYear().toString();
+    await updateUser({ lmp: `${y}-${m}-${d}` });
     onNext();
+    setIsSubmitting(false);
   }
 
   return (
@@ -209,7 +226,7 @@ function LMPStep({ onNext }: { onNext: () => void }) {
             value={day}
             onChangeText={(v) => {
               setDay(v.replace(/\D/g, ''));
-              if (v.length >= 2) monthRef.current?.focus();
+              if (v.replace(/\D/g, '').length >= 2) monthRef.current?.focus();
             }}
             keyboardType="number-pad"
             maxLength={2}
@@ -225,7 +242,7 @@ function LMPStep({ onNext }: { onNext: () => void }) {
             value={month}
             onChangeText={(v) => {
               setMonth(v.replace(/\D/g, ''));
-              if (v.length >= 2) yearRef.current?.focus();
+              if (v.replace(/\D/g, '').length >= 2) yearRef.current?.focus();
             }}
             keyboardType="number-pad"
             maxLength={2}
@@ -247,11 +264,22 @@ function LMPStep({ onNext }: { onNext: () => void }) {
           />
         </View>
       </View>
+
+      {/* Soft helper text — warm, non-judgmental */}
+      {helperText ? (
+        <View style={[styles.helperRow, helperIsWarning && styles.helperRowBlocking]}>
+          <View style={[styles.helperDot, helperIsWarning && styles.helperDotBlocking]} />
+          <Text style={[styles.helperText, helperIsWarning && styles.helperTextBlocking]}>
+            {helperText}
+          </Text>
+        </View>
+      ) : null}
+
       <TouchableOpacity
-        style={[styles.primaryButton, !isValid && styles.primaryButtonDisabled]}
+        style={[styles.primaryButton, !canContinue && styles.primaryButtonDisabled]}
         onPress={handleNext}
         activeOpacity={0.85}
-        disabled={!isValid}
+        disabled={!canContinue}
       >
         <Text style={styles.primaryButtonText}>Continue</Text>
       </TouchableOpacity>
@@ -262,8 +290,11 @@ function LMPStep({ onNext }: { onNext: () => void }) {
 function FirstPregnancyStep({ onComplete }: { onComplete: (value: boolean) => void }) {
   const { user } = useBloom();
   const [selected, setSelected] = useState<boolean | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSelect(value: boolean) {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     setSelected(value);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await new Promise((r) => setTimeout(r, 350));
@@ -284,6 +315,7 @@ function FirstPregnancyStep({ onComplete }: { onComplete: (value: boolean) => vo
           style={[styles.choiceButton, selected === true && styles.choiceButtonSelected]}
           onPress={() => handleSelect(true)}
           activeOpacity={0.85}
+          disabled={isSubmitting}
         >
           <Text style={[styles.choiceText, selected === true && styles.choiceTextSelected]}>
             Yes, it is
@@ -293,6 +325,7 @@ function FirstPregnancyStep({ onComplete }: { onComplete: (value: boolean) => vo
           style={[styles.choiceButton, selected === false && styles.choiceButtonSelected]}
           onPress={() => handleSelect(false)}
           activeOpacity={0.85}
+          disabled={isSubmitting}
         >
           <Text style={[styles.choiceText, selected === false && styles.choiceTextSelected]}>
             I've been here before
@@ -321,6 +354,7 @@ function BloomCompletionStep({
   const textSlide = useRef(new Animated.Value(24)).current;
   const btnFade = useRef(new Animated.Value(0)).current;
   const hasCompleted = useRef(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     Animated.sequence([
@@ -348,16 +382,20 @@ function BloomCompletionStep({
       Animated.timing(btnFade, { toValue: 1, duration: 500, useNativeDriver: true }).start();
     }, 1300);
 
-    // Auto-complete after 3 seconds
-    const timer = setTimeout(() => handleComplete(), 3200);
+    // Auto-complete after 3.5 seconds — longer than before to avoid race
+    const timer = setTimeout(() => handleComplete(), 3500);
     return () => clearTimeout(timer);
   }, []);
 
   async function handleComplete() {
-    if (hasCompleted.current) return;
+    if (hasCompleted.current || isSubmitting) return;
     hasCompleted.current = true;
+    setIsSubmitting(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // completeOnboarding now writes storage before updating state
     await completeOnboarding({ isFirstPregnancy: firstPreg });
+    // Small settle delay so state propagation and navigation feel calm
+    await new Promise((r) => setTimeout(r, 150));
   }
 
   return (
@@ -408,9 +446,10 @@ function BloomCompletionStep({
       {/* Enter button */}
       <Animated.View style={{ opacity: btnFade, width: '100%' }}>
         <TouchableOpacity
-          style={styles.primaryButton}
+          style={[styles.primaryButton, isSubmitting && styles.primaryButtonDisabled]}
           onPress={handleComplete}
           activeOpacity={0.85}
+          disabled={isSubmitting}
         >
           <Text style={styles.primaryButtonText}>Enter Bloom</Text>
         </TouchableOpacity>
@@ -426,12 +465,10 @@ export default function OnboardingScreen() {
   const [firstPregValue, setFirstPregValue] = useState(false);
   const insets = useSafeAreaInsets();
 
-  // Transition animation — manages all step changes
   const contentOpacity = useRef(new Animated.Value(0)).current;
   const contentSlide = useRef(new Animated.Value(28)).current;
 
   useEffect(() => {
-    // Initial entrance
     Animated.parallel([
       Animated.timing(contentOpacity, { toValue: 1, duration: 900, useNativeDriver: true }),
       Animated.spring(contentSlide, { toValue: 0, damping: 24, stiffness: 70, useNativeDriver: true }),
@@ -582,7 +619,6 @@ function OnboardingInner({
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Progress dots — only for data steps */}
           {isDataStep && (
             <View style={styles.dotsRow}>
               <ProgressDots total={DATA_STEPS} current={dataStepIndex} />
@@ -719,7 +755,7 @@ const styles = StyleSheet.create({
   dateRow: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 22,
+    marginBottom: 8,
   },
   dateInputWrap: { gap: 6 },
   dateLabel: {
@@ -742,6 +778,47 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: 'Inter_400Regular',
   },
+
+  // LMP helper / validation text
+  helperRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: Colors.peachLight,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: Colors.radius.md,
+    marginBottom: 20,
+    marginTop: 6,
+  },
+  helperRowBlocking: {
+    backgroundColor: '#F5EDE5',
+  },
+  helperDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.primary,
+    marginTop: 6,
+    flexShrink: 0,
+    opacity: 0.6,
+  },
+  helperDotBlocking: {
+    backgroundColor: '#C4876A',
+    opacity: 0.8,
+  },
+  helperText: {
+    fontSize: 14,
+    color: Colors.textWarm,
+    lineHeight: 22,
+    fontFamily: 'Inter_400Regular',
+    flex: 1,
+    fontStyle: 'italic',
+  },
+  helperTextBlocking: {
+    color: '#7A4A32',
+  },
+
   choiceRow: { gap: 14 },
   choiceButton: {
     backgroundColor: Colors.card,
@@ -813,27 +890,26 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   ring1: { width: 160, height: 160 },
-  ring2: { width: 210, height: 210 },
-  ring3: { width: 260, height: 260 },
+  ring2: { width: 200, height: 200 },
+  ring3: { width: 240, height: 240 },
   bloomTextWrap: {
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: 8,
   },
   bloomTitle: {
-    fontSize: 40,
+    fontSize: 36,
     fontWeight: '700',
     color: Colors.text,
-    textAlign: 'center',
-    lineHeight: 50,
+    lineHeight: 44,
     letterSpacing: -0.8,
+    textAlign: 'center',
     fontFamily: 'CormorantGaramond_700Bold',
   },
   bloomSubtitle: {
-    fontSize: 17,
+    fontSize: 16,
     color: Colors.textMuted,
-    textAlign: 'center',
     lineHeight: 26,
+    textAlign: 'center',
     fontFamily: 'Inter_400Regular',
   },
 });

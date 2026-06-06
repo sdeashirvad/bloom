@@ -6,7 +6,9 @@ import {
   ScrollView,
   Animated,
   TouchableOpacity,
+  TextInput,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,10 +19,19 @@ import { MoodButton } from '@/components/MoodButton';
 import { SupportCard } from '@/components/SupportCard';
 import { AmbientOrb } from '@/components/AmbientOrb';
 import { useBloom } from '@/context/BloomContext';
-import { getMoodResponse, MoodKey, getDailyCheckinAffirmation } from '@/constants/emotionalContent';
+import {
+  getMoodResponse,
+  MoodKey,
+  getDailyCheckinAffirmation,
+  getTrimester,
+} from '@/constants/emotionalContent';
 import { getTimeOfDay, TIME_GRADIENTS, TIME_ORB_COLORS } from '@/constants/timeOfDay';
+import { getReflectionPrompt } from '@/constants/reflectionPrompts';
+import { addReflection, getTodaysReflection } from '@/stores/reflectionStore';
+import { ReflectionEntry, ReflectionMood } from '@/types/reflection';
 
-const MOODS: { key: MoodKey; label: string; icon: string; color: string; subtext: string }[] = [
+// Only moods that are part of ReflectionMood
+const MOODS: { key: ReflectionMood; label: string; icon: string; color: string; subtext: string }[] = [
   { key: 'calm', label: 'Calm', icon: '🌿', color: '#4A9078', subtext: 'At peace' },
   { key: 'tired', label: 'Tired', icon: '🌙', color: '#8A7868', subtext: 'Need rest' },
   { key: 'emotional', label: 'Emotional', icon: '🌊', color: '#7858A0', subtext: 'Feeling deep' },
@@ -34,38 +45,235 @@ const MOOD_LABELS: Record<string, string> = {
   emotional: 'tender',
   anxious: 'unsettled',
   happy: 'joyful',
-  overwhelmed: 'overwhelmed',
-  grateful: 'grateful',
 };
+
+type FlowStep = 'select' | 'prompt' | 'response';
 
 function getLastMoodMemory(lastMood: string, lastMoodDate: string): string | null {
   const lastDate = new Date(lastMoodDate);
   const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-
   const isToday = lastDate.toDateString() === today.toDateString();
   if (isToday) return null;
 
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
   const isYesterday = lastDate.toDateString() === yesterday.toDateString();
   const word = MOOD_LABELS[lastMood] || lastMood;
 
   if (isYesterday) return `Yesterday you were ${word}.`;
-
-  const diffMs = today.getTime() - lastDate.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffDays = Math.floor((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
   if (diffDays <= 6) return `${diffDays} days ago you were ${word}.`;
-
   return null;
 }
+
+// ─── Step 1: Mood selection ───────────────────────────────────────────────────
+
+function MoodSelectStep({
+  onSelect,
+  lastMood,
+  lastMoodDate,
+  checkinAffirmation,
+  nameGreeting,
+  headerFade,
+  headerSlide,
+}: {
+  onSelect: (mood: ReflectionMood) => void;
+  lastMood?: string;
+  lastMoodDate?: string;
+  checkinAffirmation: string;
+  nameGreeting: string;
+  headerFade: Animated.Value;
+  headerSlide: Animated.Value;
+}) {
+  const lastMoodMemory =
+    lastMood && lastMoodDate ? getLastMoodMemory(lastMood, lastMoodDate) : null;
+
+  return (
+    <>
+      <Animated.View style={{ opacity: headerFade, transform: [{ translateY: headerSlide }] }}>
+        <Text style={styles.eyebrow}>Daily reflection</Text>
+        <Text style={styles.pageTitle}>How are you{'\n'}feeling?</Text>
+        <Text style={styles.subtitle}>{nameGreeting}</Text>
+      </Animated.View>
+
+      {lastMoodMemory ? (
+        <Animated.View style={{ opacity: headerFade }}>
+          <View style={styles.memoryPill}>
+            <View style={styles.memoryPillDot} />
+            <Text style={styles.memoryPillText}>{lastMoodMemory} How are you today?</Text>
+          </View>
+        </Animated.View>
+      ) : null}
+
+      <View style={styles.moodGrid}>
+        {MOODS.map((mood, i) => (
+          <MoodButton
+            key={mood.key}
+            label={mood.label}
+            icon={mood.icon}
+            isSelected={false}
+            onPress={() => onSelect(mood.key)}
+            color={mood.color}
+            delay={i * 55 + 200}
+          />
+        ))}
+      </View>
+
+      <Animated.View style={{ opacity: headerFade }}>
+        <LinearGradient colors={['#FDF0EA', '#F9E6D8']} style={styles.affirmationCard}>
+          <View style={styles.affirmationDecor} />
+          <Text style={styles.affirmationText}>"{checkinAffirmation}"</Text>
+        </LinearGradient>
+      </Animated.View>
+    </>
+  );
+}
+
+// ─── Step 2 + 3: Prompt + optional text input ─────────────────────────────────
+
+function ReflectionPromptStep({
+  mood,
+  prompt,
+  reflectionText,
+  setReflectionText,
+  onSave,
+  onSkip,
+  isSaving,
+}: {
+  mood: ReflectionMood;
+  prompt: string;
+  reflectionText: string;
+  setReflectionText: (v: string) => void;
+  onSave: () => void;
+  onSkip: () => void;
+  isSaving: boolean;
+}) {
+  const moodData = MOODS.find((m) => m.key === mood)!;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.spring(slideAnim, { toValue: 0, damping: 22, stiffness: 100, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+      {/* Mood echo pill */}
+      <View style={[styles.moodEchoPill, { backgroundColor: moodData.color + '18' }]}>
+        <Text style={styles.moodEchoIcon}>{moodData.icon}</Text>
+        <Text style={[styles.moodEchoLabel, { color: moodData.color }]}>
+          Feeling {moodData.label.toLowerCase()}
+        </Text>
+      </View>
+
+      {/* Prompt */}
+      <Text style={styles.promptTitle}>{prompt}</Text>
+      <Text style={styles.promptSubtitle}>
+        Write a few words, if you'd like. There's no pressure here.
+      </Text>
+
+      {/* Optional text input */}
+      <TextInput
+        style={styles.reflectionInput}
+        placeholder="Whatever is here is welcome..."
+        placeholderTextColor={Colors.textLight}
+        value={reflectionText}
+        onChangeText={setReflectionText}
+        multiline
+        numberOfLines={4}
+        textAlignVertical="top"
+        returnKeyType="default"
+      />
+
+      {/* Save */}
+      <TouchableOpacity
+        style={[styles.primaryButton, isSaving && styles.primaryButtonDisabled]}
+        onPress={onSave}
+        activeOpacity={0.85}
+        disabled={isSaving}
+      >
+        <Text style={styles.primaryButtonText}>
+          {reflectionText.trim() ? 'Save reflection' : 'Continue'}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Skip */}
+      <TouchableOpacity
+        style={styles.skipBtn}
+        onPress={onSkip}
+        activeOpacity={0.7}
+        disabled={isSaving}
+      >
+        <Text style={styles.skipText}>Skip for today</Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+// ─── Step 4: Bloom response card + history stamp ──────────────────────────────
+
+function ReflectionResponseStep({
+  mood,
+  bloomReply,
+  bloomReplyColor,
+  bloomReplyGradient,
+  savedAt,
+  onReset,
+}: {
+  mood: ReflectionMood;
+  bloomReply: string;
+  bloomReplyColor: string;
+  bloomReplyGradient: readonly [string, string];
+  savedAt: string;
+  onReset: () => void;
+}) {
+  return (
+    <>
+      <SupportCard
+        title="A moment held."
+        message={bloomReply}
+        color={bloomReplyColor}
+        gradient={bloomReplyGradient}
+      />
+
+      <View style={styles.historyRow}>
+        <View style={styles.historyPill}>
+          <Ionicons name="time-outline" size={13} color={Colors.textSoft} />
+          <Text style={styles.historyText}>
+            Reflected ·{' '}
+            {new Date(savedAt).toLocaleDateString('en-US', {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+            })}
+          </Text>
+        </View>
+      </View>
+
+      <TouchableOpacity onPress={onReset} style={styles.resetBtn} activeOpacity={0.7}>
+        <Ionicons name="refresh-outline" size={15} color={Colors.textSoft} />
+        <Text style={styles.resetText}>Reflect again</Text>
+      </TouchableOpacity>
+    </>
+  );
+}
+
+// ─── Main mood screen ─────────────────────────────────────────────────────────
 
 export default function MoodScreen() {
   const insets = useSafeAreaInsets();
   const { user, pregnancyWeek, updateUser } = useBloom();
-  const [selectedMood, setSelectedMood] = useState<MoodKey | null>(
-    (user.lastMood as MoodKey) || null
-  );
-  const [responseKey, setResponseKey] = useState(0);
+
+  const [flowStep, setFlowStep] = useState<FlowStep>('select');
+  const [selectedMood, setSelectedMood] = useState<ReflectionMood | null>(null);
+  const [reflectionText, setReflectionText] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedEntry, setSavedEntry] = useState<ReflectionEntry | null>(null);
+  const [promptSeed] = useState(() => new Date().getDate() + new Date().getMonth());
+  const [checkedTodayEntry, setCheckedTodayEntry] = useState(false);
 
   const headerFade = useRef(new Animated.Value(0)).current;
   const headerSlide = useRef(new Animated.Value(24)).current;
@@ -75,38 +283,109 @@ export default function MoodScreen() {
       Animated.timing(headerFade, { toValue: 1, duration: 680, useNativeDriver: true }),
       Animated.spring(headerSlide, { toValue: 0, damping: 22, stiffness: 100, useNativeDriver: true }),
     ]).start();
+
+    // Restore today's reflection if it exists
+    getTodaysReflection().then((entry) => {
+      if (entry) {
+        setSavedEntry(entry);
+        setSelectedMood(entry.mood);
+        setFlowStep('response');
+      }
+      setCheckedTodayEntry(true);
+    });
   }, []);
 
-  function handleMoodSelect(moodKey: MoodKey) {
-    const isNew = moodKey !== selectedMood;
-    setSelectedMood(moodKey);
-    if (isNew) setResponseKey((k) => k + 1);
-    updateUser({ lastMood: moodKey, lastMoodDate: new Date().toISOString() });
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }
-
-  function handleReset() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSelectedMood(null);
-  }
-
   const week = pregnancyWeek || 18;
-  const moodResponse = selectedMood ? getMoodResponse(selectedMood, week + responseKey) : null;
-
-  const topPad = insets.top + (Platform.OS === 'web' ? 67 : 0);
-  const bottomPad = Platform.OS === 'web' ? 34 : 0;
-
-  const lastMoodMemory =
-    user.lastMood && user.lastMoodDate && !selectedMood
-      ? getLastMoodMemory(user.lastMood, user.lastMoodDate)
-      : null;
-
+  const trimester = getTrimester(week);
   const nameGreeting = user.name ? `${user.name}, how are you today?` : 'How are you today?';
   const checkinAffirmation = getDailyCheckinAffirmation();
 
   const timeOfDay = getTimeOfDay();
   const bgGradient = TIME_GRADIENTS[timeOfDay];
   const orbColors = TIME_ORB_COLORS[timeOfDay];
+
+  const topPad = insets.top + (Platform.OS === 'web' ? 67 : 0);
+  const bottomPad = Platform.OS === 'web' ? 34 : 0;
+
+  function handleMoodSelect(mood: ReflectionMood) {
+    setSelectedMood(mood);
+    setReflectionText('');
+    setFlowStep('prompt');
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }
+
+  async function handleSave() {
+    if (!selectedMood || isSaving) return;
+    setIsSaving(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    const moodResponse = getMoodResponse(selectedMood as MoodKey, week + promptSeed);
+    const entry: ReflectionEntry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      createdAt: new Date().toISOString(),
+      pregnancyWeek: week,
+      trimester,
+      mood: selectedMood,
+      prompt: getReflectionPrompt(selectedMood, promptSeed),
+      userReflection: reflectionText.trim() || undefined,
+      bloomReply: moodResponse.message,
+    };
+
+    await addReflection(entry);
+    await updateUser({
+      lastMood: selectedMood,
+      lastMoodDate: new Date().toISOString(),
+    });
+
+    setSavedEntry(entry);
+    setFlowStep('response');
+    setIsSaving(false);
+  }
+
+  async function handleSkip() {
+    if (!selectedMood || isSaving) return;
+    setIsSaving(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    const moodResponse = getMoodResponse(selectedMood as MoodKey, week + promptSeed);
+    const entry: ReflectionEntry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      createdAt: new Date().toISOString(),
+      pregnancyWeek: week,
+      trimester,
+      mood: selectedMood,
+      bloomReply: moodResponse.message,
+    };
+
+    await addReflection(entry);
+    await updateUser({
+      lastMood: selectedMood,
+      lastMoodDate: new Date().toISOString(),
+    });
+
+    setSavedEntry(entry);
+    setFlowStep('response');
+    setIsSaving(false);
+  }
+
+  function handleReset() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedMood(null);
+    setReflectionText('');
+    setSavedEntry(null);
+    setFlowStep('select');
+  }
+
+  // Derive bloom response details for the response step
+  const bloomMoodResponse =
+    selectedMood && savedEntry
+      ? getMoodResponse(selectedMood as MoodKey, week + promptSeed)
+      : null;
+
+  const currentPrompt =
+    selectedMood ? getReflectionPrompt(selectedMood, promptSeed) : '';
+
+  if (!checkedTodayEntry) return null;
 
   return (
     <LinearGradient
@@ -128,94 +407,54 @@ export default function MoodScreen() {
         style={{ bottom: 180, left: -55 }}
       />
 
-      <ScrollView
-        contentContainerStyle={[
-          styles.scroll,
-          { paddingTop: topPad + 28, paddingBottom: bottomPad + 110 },
-        ]}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* Header */}
-        <Animated.View style={{ opacity: headerFade, transform: [{ translateY: headerSlide }] }}>
-          <Text style={styles.eyebrow}>Daily check-in</Text>
-          <Text style={styles.pageTitle}>How are you{'\n'}feeling?</Text>
-          <Text style={styles.subtitle}>{nameGreeting}</Text>
-        </Animated.View>
-
-        {/* Last mood memory — above grid, only when not yet selected today */}
-        {lastMoodMemory ? (
-          <Animated.View style={{ opacity: headerFade }}>
-            <View style={styles.memoryPill}>
-              <View style={styles.memoryPillDot} />
-              <Text style={styles.memoryPillText}>{lastMoodMemory} How are you today?</Text>
-            </View>
-          </Animated.View>
-        ) : null}
-
-        {/* Mood grid */}
-        <View style={styles.moodGrid}>
-          {MOODS.map((mood, i) => (
-            <MoodButton
-              key={mood.key}
-              label={mood.label}
-              icon={mood.icon}
-              isSelected={selectedMood === mood.key}
-              onPress={() => handleMoodSelect(mood.key)}
-              color={mood.color}
-              delay={i * 55 + 200}
+        <ScrollView
+          contentContainerStyle={[
+            styles.scroll,
+            { paddingTop: topPad + 28, paddingBottom: bottomPad + 110 },
+          ]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {flowStep === 'select' && (
+            <MoodSelectStep
+              onSelect={handleMoodSelect}
+              lastMood={user.lastMood}
+              lastMoodDate={user.lastMoodDate}
+              checkinAffirmation={checkinAffirmation}
+              nameGreeting={nameGreeting}
+              headerFade={headerFade}
+              headerSlide={headerSlide}
             />
-          ))}
-        </View>
+          )}
 
-        {/* Response card */}
-        {moodResponse ? (
-          <SupportCard
-            key={`${selectedMood}-${responseKey}`}
-            title={moodResponse.title}
-            message={moodResponse.message}
-            color={moodResponse.color}
-            gradient={moodResponse.gradient}
-          />
-        ) : null}
+          {flowStep === 'prompt' && selectedMood && (
+            <ReflectionPromptStep
+              mood={selectedMood}
+              prompt={currentPrompt}
+              reflectionText={reflectionText}
+              setReflectionText={setReflectionText}
+              onSave={handleSave}
+              onSkip={handleSkip}
+              isSaving={isSaving}
+            />
+          )}
 
-        {/* Reset */}
-        {selectedMood ? (
-          <TouchableOpacity onPress={handleReset} style={styles.resetBtn} activeOpacity={0.7}>
-            <Ionicons name="refresh-outline" size={15} color={Colors.textSoft} />
-            <Text style={styles.resetText}>Check in again</Text>
-          </TouchableOpacity>
-        ) : null}
-
-        {/* Pre-selection affirmation — when nothing selected */}
-        {!selectedMood ? (
-          <Animated.View style={{ opacity: headerFade }}>
-            <LinearGradient
-              colors={['#FDF0EA', '#F9E6D8']}
-              style={styles.affirmationCard}
-            >
-              <View style={styles.affirmationDecor} />
-              <Text style={styles.affirmationText}>"{checkinAffirmation}"</Text>
-            </LinearGradient>
-          </Animated.View>
-        ) : null}
-
-        {/* Last check-in stamp */}
-        {user.lastMood && user.lastMoodDate && !lastMoodMemory ? (
-          <View style={styles.historyRow}>
-            <View style={styles.historyPill}>
-              <Ionicons name="time-outline" size={13} color={Colors.textSoft} />
-              <Text style={styles.historyText}>
-                Last check-in ·{' '}
-                {new Date(user.lastMoodDate).toLocaleDateString('en-US', {
-                  weekday: 'short',
-                  month: 'short',
-                  day: 'numeric',
-                })}
-              </Text>
-            </View>
-          </View>
-        ) : null}
-      </ScrollView>
+          {flowStep === 'response' && savedEntry && bloomMoodResponse && (
+            <ReflectionResponseStep
+              mood={savedEntry.mood}
+              bloomReply={savedEntry.bloomReply}
+              bloomReplyColor={bloomMoodResponse.color}
+              bloomReplyGradient={bloomMoodResponse.gradient}
+              savedAt={savedEntry.createdAt}
+              onReset={handleReset}
+            />
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </LinearGradient>
   );
 }
@@ -284,21 +523,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
-  resetBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 22,
-    paddingVertical: 12,
-  },
-  resetText: {
-    fontSize: 13,
-    color: Colors.textSoft,
-    fontFamily: 'Inter_400Regular',
-    letterSpacing: 0.2,
-  },
-
   affirmationCard: {
     borderRadius: Colors.radius.xl,
     padding: 28,
@@ -328,6 +552,92 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
 
+  // Reflection prompt step
+  moodEchoPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: Colors.radius.full,
+    marginBottom: 28,
+  },
+  moodEchoIcon: { fontSize: 16 },
+  moodEchoLabel: {
+    fontSize: 13,
+    fontFamily: 'Inter_500Medium',
+    fontWeight: '500',
+  },
+  promptTitle: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: Colors.text,
+    lineHeight: 40,
+    letterSpacing: -0.6,
+    marginBottom: 10,
+    fontFamily: 'CormorantGaramond_700Bold',
+  },
+  promptSubtitle: {
+    fontSize: 15,
+    color: Colors.textMuted,
+    lineHeight: 24,
+    marginBottom: 28,
+    fontFamily: 'Inter_400Regular',
+  },
+  reflectionInput: {
+    backgroundColor: Colors.card,
+    borderRadius: Colors.radius.lg,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    fontSize: 16,
+    color: Colors.text,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    fontFamily: 'Inter_400Regular',
+    lineHeight: 26,
+    minHeight: 120,
+    marginBottom: 20,
+  },
+
+  primaryButton: {
+    backgroundColor: Colors.primary,
+    borderRadius: Colors.radius.full,
+    paddingVertical: 18,
+    alignItems: 'center',
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+    elevation: 6,
+    marginTop: 4,
+  },
+  primaryButtonDisabled: {
+    backgroundColor: Colors.peach,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  primaryButtonText: {
+    color: Colors.white,
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+    fontFamily: 'Inter_600SemiBold',
+  },
+
+  skipBtn: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    marginTop: 4,
+  },
+  skipText: {
+    fontSize: 14,
+    color: Colors.textSoft,
+    fontFamily: 'Inter_400Regular',
+    letterSpacing: 0.2,
+  },
+
+  // Response step
   historyRow: {
     alignItems: 'center',
     marginTop: 28,
@@ -343,6 +653,21 @@ const styles = StyleSheet.create({
   },
   historyText: {
     fontSize: 12,
+    color: Colors.textSoft,
+    fontFamily: 'Inter_400Regular',
+    letterSpacing: 0.2,
+  },
+
+  resetBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 18,
+    paddingVertical: 12,
+  },
+  resetText: {
+    fontSize: 13,
     color: Colors.textSoft,
     fontFamily: 'Inter_400Regular',
     letterSpacing: 0.2,

@@ -47,7 +47,7 @@ export function BloomProvider({ children }: { children: ReactNode }) {
       if (stored) {
         setUser(JSON.parse(stored));
       }
-    } catch (e) {
+    } catch (_) {
       // use defaults
     } finally {
       setIsLoading(false);
@@ -59,21 +59,22 @@ export function BloomProvider({ children }: { children: ReactNode }) {
     setUser(updated);
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    } catch (e) {}
+    } catch (_) {}
   }
 
+  // Write to storage FIRST, then update state — prevents navigation race condition
   async function completeOnboarding(data: Partial<BloomUser>) {
     const updated: BloomUser = { ...user, ...data, hasCompletedOnboarding: true };
-    setUser(updated);
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    } catch (e) {}
+    } catch (_) {}
+    setUser(updated);
   }
 
   async function clearJourney() {
     try {
       await AsyncStorage.removeItem(STORAGE_KEY);
-    } catch (e) {}
+    } catch (_) {}
     setUser({ ...defaultUser });
   }
 
@@ -88,21 +89,20 @@ export function BloomProvider({ children }: { children: ReactNode }) {
     return { pregnancyWeek: Math.max(1, Math.min(42, week)), daysAlong: days };
   }, [user.lmp]);
 
-  const value = useMemo(() => ({
-    user,
-    isLoading,
-    updateUser,
-    completeOnboarding,
-    clearJourney,
-    pregnancyWeek,
-    daysAlong,
-  }), [user, isLoading, pregnancyWeek, daysAlong]);
-
-  return (
-    <BloomContext.Provider value={value}>
-      {children}
-    </BloomContext.Provider>
+  const value = useMemo(
+    () => ({
+      user,
+      isLoading,
+      updateUser,
+      completeOnboarding,
+      clearJourney,
+      pregnancyWeek,
+      daysAlong,
+    }),
+    [user, isLoading, pregnancyWeek, daysAlong],
   );
+
+  return <BloomContext.Provider value={value}>{children}</BloomContext.Provider>;
 }
 
 export function useBloom() {
