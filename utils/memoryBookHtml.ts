@@ -4,6 +4,16 @@
  * Produces a self-contained HTML string that expo-print renders into a PDF.
  * The output is an emotional keepsake — not a data export.
  *
+ * This book preserves THE USER'S VOICE only:
+ * - User journal/reflection text
+ * - Mood
+ * - Milestone tags
+ * - Date & pregnancy week
+ * - Trimester grouping
+ *
+ * It does NOT include Bloom replies, affirmations, or any system-generated text.
+ * The PDF should feel like her preserved journey, not an AI-generated scrapbook.
+ *
  * Visual language: editorial, airy, warm, book-like.
  * Typography: Georgia (serif) for headings/quotes, system sans-serif for body.
  */
@@ -310,9 +320,9 @@ function buildStyles(): string {
       padding-top: 56pt;
     }
 
-    /* ── Entry ── */
+    /* ── Entry — user voice only ── */
     .entry {
-      margin-bottom: 48pt;
+      margin-bottom: 52pt;
       page-break-inside: avoid;
     }
 
@@ -324,7 +334,7 @@ function buildStyles(): string {
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      margin-bottom: 12pt;
+      margin-bottom: 14pt;
     }
 
     .entry-week-mood {
@@ -346,50 +356,41 @@ function buildStyles(): string {
       font-size: 11pt;
       color: #D4876A;
       font-family: -apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif;
-      margin-bottom: 12pt;
+      margin-bottom: 14pt;
       letter-spacing: 0.2pt;
     }
 
     .entry-kept-close {
       font-size: 10pt;
       color: #D4876A;
-      margin-bottom: 10pt;
+      margin-bottom: 12pt;
       opacity: 0.7;
     }
 
+    /* The user's words — the heart of the page */
     .entry-reflection {
-      font-size: 18pt;
+      font-size: 20pt;
       color: #2D1F17;
-      line-height: 1.65;
+      line-height: 1.70;
       font-style: italic;
       letter-spacing: -0.2pt;
-      margin-bottom: 18pt;
     }
 
-    .entry-bloom-label {
-      font-size: 9pt;
-      color: #B09A80;
-      font-family: -apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif;
-      font-weight: 600;
-      letter-spacing: 2pt;
-      text-transform: uppercase;
-      margin-bottom: 7pt;
-    }
-
-    .entry-bloom-reply {
-      font-size: 13pt;
-      color: #8B7355;
+    /* Mood-only entry (no written reflection) */
+    .entry-mood-note {
+      font-size: 14pt;
+      color: #A08870;
       font-family: -apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif;
       font-weight: 300;
-      line-height: 1.75;
       font-style: italic;
+      line-height: 1.7;
     }
 
     .entry-separator {
       width: 100%;
       height: 1pt;
       background: #EDE5D8;
-      margin-top: 36pt;
+      margin-top: 40pt;
     }
 
     /* ── Closing page ── */
@@ -445,11 +446,10 @@ function buildStyles(): string {
 
 function buildCoverPage(input: MemoryBookInput): string {
   const name = input.userName ? escape(input.userName) : null;
-  const generatedYear = input.generatedAt.getFullYear();
   const generatedMonth = input.generatedAt.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   const forLine = name
-    ? `For ${name} &amp; little one`
+    ? `For ${name}`
     : 'A quiet collection of moments from this pregnancy journey.';
 
   const dateLine = input.dueDate
@@ -467,7 +467,7 @@ function buildCoverPage(input: MemoryBookInput): string {
         <div class="cover-date">${dateLine}</div>
       </div>
       <div class="cover-bottom">
-        <div class="cover-bottom-text">A memory book — created with care, for you.</div>
+        <div class="cover-bottom-text">Your words, your journey — preserved with care.</div>
       </div>
     </div>
   `;
@@ -479,15 +479,15 @@ function buildOpeningLetterPage(userName: string): string {
 
   return `
     <div class="page letter">
-      <div class="letter-eyebrow">A note from Bloom</div>
+      <div class="letter-eyebrow">A note</div>
       <div class="letter-body">
         <p>${salutation}</p>
-        <p>These pages hold small moments from your journey — reflections, emotions, difficult days, and quiet joys you chose to share.</p>
-        <p>Pregnancy changes us slowly, deeply, and often invisibly. Some of it you'll remember clearly. Some of it you've already begun to forget. That's why these moments matter — not as a record, but as a reminder of who you were during this season.</p>
-        <p>Whatever you carried here — exhaustion, wonder, fear, love, uncertainty — it was real. And it was enough.</p>
-        <p>Bloom was honored to walk beside you through it.</p>
+        <p>These pages hold your words — the small moments, feelings, and thoughts you chose to capture during this season of becoming a mother.</p>
+        <p>This is not a summary. This is not a report. This is you, in your own voice, across the weeks of your pregnancy.</p>
+        <p>Some days were tender. Some were hard. Some were simply quiet. All of them are here, gathered gently, exactly as you wrote them.</p>
+        <p>This is your story. In your words. Yours alone.</p>
       </div>
-      <div class="letter-sign">Bloom ✦</div>
+      <div class="letter-sign">✦</div>
     </div>
   `;
 }
@@ -503,7 +503,7 @@ function buildKeptCloseSection(entries: ReflectionEntry[]): string {
         <span class="kept-close-heart">❤</span>
         <span class="kept-close-title">Moments Kept Close</span>
       </div>
-      <div class="kept-close-subtitle">These reflections meant something more.</div>
+      <div class="kept-close-subtitle">Words that meant something more.</div>
       ${entryHtml}
     </div>
   `;
@@ -523,6 +523,11 @@ function buildTrimesterHeaderPage(section: TrimesterSection): string {
   `;
 }
 
+/**
+ * Build a single entry — USER VOICE ONLY.
+ * Shows: date, week, mood, milestone tag, keptClose flag, user's written reflection.
+ * Does NOT include Bloom replies, affirmations, or any system-generated text.
+ */
 function buildEntry(entry: ReflectionEntry, isLast: boolean): string {
   const moodWord = MOOD_WORDS[entry.mood] ?? entry.mood;
   const weekMoodLine = `Week ${entry.pregnancyWeek} &nbsp;·&nbsp; ${escape(moodWord)}`;
@@ -536,9 +541,10 @@ function buildEntry(entry: ReflectionEntry, isLast: boolean): string {
     ? `<div class="entry-kept-close">❤ &nbsp;Kept close</div>`
     : '';
 
+  // The user's own words — this is the soul of the entry
   const reflectionHtml = entry.userReflection
     ? `<div class="entry-reflection">&ldquo;${escape(entry.userReflection)}&rdquo;</div>`
-    : '';
+    : `<div class="entry-mood-note">A quiet moment — feeling ${escape(moodWord.toLowerCase())}.</div>`;
 
   const separator = isLast ? '' : `<div class="entry-separator"></div>`;
 
@@ -551,8 +557,6 @@ function buildEntry(entry: ReflectionEntry, isLast: boolean): string {
       ${milestoneHtml}
       ${keptCloseHtml}
       ${reflectionHtml}
-      <div class="entry-bloom-label">Bloom</div>
-      <div class="entry-bloom-reply">${escape(entry.bloomReply)}</div>
       ${separator}
     </div>
   `;
@@ -561,8 +565,8 @@ function buildEntry(entry: ReflectionEntry, isLast: boolean): string {
 function buildTrimesterContentPages(entries: ReflectionEntry[]): string {
   if (entries.length === 0) return '';
 
-  // Split entries across pages — ~4 entries per page to keep whitespace generous
-  const ENTRIES_PER_PAGE = 4;
+  // Split entries across pages — ~3 entries per page for generous whitespace
+  const ENTRIES_PER_PAGE = 3;
   const pages: ReflectionEntry[][] = [];
   for (let i = 0; i < entries.length; i += ENTRIES_PER_PAGE) {
     pages.push(entries.slice(i, i + ENTRIES_PER_PAGE));
@@ -578,8 +582,8 @@ function buildClosingPage(): string {
   return `
     <div class="page closing">
       <div class="closing-quote">
-        Your journey was never measured by perfect days —
-        only by the love, courage, and tenderness you carried through each one.
+        You carried wonder, fear, love, and uncertainty —
+        sometimes all at once. These words are proof of that courage.
       </div>
       <div class="closing-decor-line"></div>
       <div class="closing-bloom">Bloom</div>
@@ -636,7 +640,6 @@ export function buildMemoryBookHtml(input: MemoryBookInput): string {
 }
 
 function buildEmptyStateHtml(userName: string): string {
-  const name = userName ? escape(userName) : null;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -654,7 +657,7 @@ function buildEmptyStateHtml(userName: string): string {
   <div class="page closing">
     <div class="closing-quote">
       Your journey is just beginning.
-      When you've shared your first moments with Bloom,
+      When you've shared your first moments,
       they'll find their home here.
     </div>
     <div class="closing-bloom">Bloom</div>

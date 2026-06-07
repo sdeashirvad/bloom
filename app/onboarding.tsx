@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
+  Easing,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,8 +20,11 @@ import { BabyIllustration } from '@/components/BabyIllustration';
 import { useBloom } from '@/context/BloomContext';
 import { validateLMPDate, parseLMPFields } from '@/utils/pregnancyValidation';
 
-// Steps: 0,1,2 = story  |  3,4,5 = data  |  6 = bloom completion
 const DATA_STEPS = 3;
+
+// ─── Easing curves ────────────────────────────────────────────────────────────
+const gentleEaseOut = Easing.out(Easing.cubic);
+const softEaseOut = Easing.out(Easing.quad);
 
 // ─── Decorative bloom shape ──────────────────────────────────────────────────
 
@@ -36,8 +40,18 @@ function BloomDecor({
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.06, duration: 4200, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 4200, useNativeDriver: true }),
+        Animated.timing(pulseAnim, {
+          toValue: 1.04,
+          duration: 5000,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.sin),
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 5000,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.sin),
+        }),
       ])
     ).start();
     return () => pulseAnim.stopAnimation();
@@ -371,12 +385,12 @@ function BloomCompletionStep({
   const ring1 = useRef(new Animated.Value(0)).current;
   const ring2 = useRef(new Animated.Value(0)).current;
   const ring3 = useRef(new Animated.Value(0)).current;
-  const illustScale = useRef(new Animated.Value(0.2)).current;
+  const illustScale = useRef(new Animated.Value(0.3)).current;
+  const illustOpacity = useRef(new Animated.Value(0)).current;
   const textFade = useRef(new Animated.Value(0)).current;
-  const textSlide = useRef(new Animated.Value(24)).current;
+  const textSlide = useRef(new Animated.Value(16)).current;
   const btnFade = useRef(new Animated.Value(0)).current;
 
-  // Dedication overlay
   const dedicationFade = useRef(new Animated.Value(0)).current;
   const dedicationTextFade = useRef(new Animated.Value(0)).current;
   const [dedicationVisible, setDedicationVisible] = useState(false);
@@ -385,30 +399,73 @@ function BloomCompletionStep({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    Animated.sequence([
-      Animated.spring(illustScale, {
+    // Gentle illustration entrance — scale + fade, no spring bounce
+    Animated.parallel([
+      Animated.timing(illustScale, {
         toValue: 1,
-        damping: 16,
-        stiffness: 72,
+        duration: 900,
         useNativeDriver: true,
+        easing: gentleEaseOut,
       }),
-      Animated.stagger(140, [
-        Animated.spring(ring1, { toValue: 1, damping: 22, stiffness: 50, useNativeDriver: true }),
-        Animated.spring(ring2, { toValue: 1, damping: 22, stiffness: 40, useNativeDriver: true }),
-        Animated.spring(ring3, { toValue: 1, damping: 22, stiffness: 32, useNativeDriver: true }),
-      ]),
+      Animated.timing(illustOpacity, {
+        toValue: 1,
+        duration: 700,
+        useNativeDriver: true,
+        easing: softEaseOut,
+      }),
     ]).start();
 
+    // Rings expand with stagger — overdamped timing
+    setTimeout(() => {
+      Animated.stagger(160, [
+        Animated.timing(ring1, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+          easing: gentleEaseOut,
+        }),
+        Animated.timing(ring2, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+          easing: gentleEaseOut,
+        }),
+        Animated.timing(ring3, {
+          toValue: 1,
+          duration: 1100,
+          useNativeDriver: true,
+          easing: gentleEaseOut,
+        }),
+      ]).start();
+    }, 200);
+
+    // Text fades in softly
     setTimeout(() => {
       Animated.parallel([
-        Animated.timing(textFade, { toValue: 1, duration: 800, useNativeDriver: true }),
-        Animated.spring(textSlide, { toValue: 0, damping: 24, stiffness: 88, useNativeDriver: true }),
+        Animated.timing(textFade, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+          easing: softEaseOut,
+        }),
+        Animated.timing(textSlide, {
+          toValue: 0,
+          duration: 800,
+          useNativeDriver: true,
+          easing: gentleEaseOut,
+        }),
       ]).start();
-    }, 500);
+    }, 600);
 
+    // Button fades in last
     setTimeout(() => {
-      Animated.timing(btnFade, { toValue: 1, duration: 600, useNativeDriver: true }).start();
-    }, 1400);
+      Animated.timing(btnFade, {
+        toValue: 1,
+        duration: 700,
+        useNativeDriver: true,
+        easing: softEaseOut,
+      }).start();
+    }, 1500);
   }, []);
 
   async function handleComplete() {
@@ -417,72 +474,81 @@ function BloomCompletionStep({
     setIsSubmitting(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    // Show dedication overlay — soft atmospheric moment before entering
     setDedicationVisible(true);
 
-    // 1. Fade the rest of the screen out softly
     Animated.timing(dedicationFade, {
       toValue: 1,
-      duration: 900,
+      duration: 1000,
       useNativeDriver: true,
+      easing: softEaseOut,
     }).start();
 
-    // 2. After background settles, fade in the dedication text
-    await new Promise((r) => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 600));
     Animated.timing(dedicationTextFade, {
       toValue: 1,
-      duration: 1100,
+      duration: 1200,
       useNativeDriver: true,
+      easing: softEaseOut,
     }).start();
 
-    // 3. Hold quietly — let the words breathe
-    await new Promise((r) => setTimeout(r, 1800));
+    await new Promise((r) => setTimeout(r, 2000));
 
-    // 4. Fade the text out gently
     await new Promise<void>((r) => {
       Animated.timing(dedicationTextFade, {
         toValue: 0,
-        duration: 700,
+        duration: 800,
         useNativeDriver: true,
+        easing: Easing.in(Easing.quad),
       }).start(() => r());
     });
 
-    // 5. Navigate — the fade-out transition carries us forward
     await completeOnboarding({ isFirstPregnancy: firstPreg });
     await new Promise((r) => setTimeout(r, 120));
   }
 
   return (
     <View style={styles.bloomContainer}>
-      {/* Expanding rings */}
       <View style={styles.ringsWrap}>
         <Animated.View
           style={[
             styles.ring,
             styles.ring3,
-            { transform: [{ scale: ring3 }], opacity: ring3.interpolate({ inputRange: [0, 1], outputRange: [0, 0.1] }) },
+            {
+              transform: [{ scale: ring3 }],
+              opacity: ring3.interpolate({ inputRange: [0, 1], outputRange: [0, 0.1] }),
+            },
           ]}
         />
         <Animated.View
           style={[
             styles.ring,
             styles.ring2,
-            { transform: [{ scale: ring2 }], opacity: ring2.interpolate({ inputRange: [0, 1], outputRange: [0, 0.16] }) },
+            {
+              transform: [{ scale: ring2 }],
+              opacity: ring2.interpolate({ inputRange: [0, 1], outputRange: [0, 0.16] }),
+            },
           ]}
         />
         <Animated.View
           style={[
             styles.ring,
             styles.ring1,
-            { transform: [{ scale: ring1 }], opacity: ring1.interpolate({ inputRange: [0, 1], outputRange: [0, 0.24] }) },
+            {
+              transform: [{ scale: ring1 }],
+              opacity: ring1.interpolate({ inputRange: [0, 1], outputRange: [0, 0.24] }),
+            },
           ]}
         />
-        <Animated.View style={{ transform: [{ scale: illustScale }] }}>
+        <Animated.View
+          style={{
+            transform: [{ scale: illustScale }],
+            opacity: illustOpacity,
+          }}
+        >
           <BabyIllustration week={18} size={100} />
         </Animated.View>
       </View>
 
-      {/* Main text */}
       <Animated.View
         style={[
           styles.bloomTextWrap,
@@ -497,7 +563,6 @@ function BloomCompletionStep({
         </Text>
       </Animated.View>
 
-      {/* Enter button */}
       <Animated.View style={{ opacity: btnFade, width: '100%' }}>
         <TouchableOpacity
           style={[styles.primaryButton, isSubmitting && styles.primaryButtonDisabled]}
@@ -512,7 +577,6 @@ function BloomCompletionStep({
         </TouchableOpacity>
       </Animated.View>
 
-      {/* ── Dedication overlay ── */}
       {dedicationVisible ? (
         <Animated.View
           style={[StyleSheet.absoluteFillObject, styles.dedicationOverlay, { opacity: dedicationFade }]}
@@ -535,25 +599,58 @@ export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
 
   const contentOpacity = useRef(new Animated.Value(0)).current;
-  const contentSlide = useRef(new Animated.Value(28)).current;
+  const contentSlide = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
+    // Soft entrance — pure timing, no springs, no oscillation
     Animated.parallel([
-      Animated.timing(contentOpacity, { toValue: 1, duration: 1000, useNativeDriver: true }),
-      Animated.spring(contentSlide, { toValue: 0, damping: 24, stiffness: 70, useNativeDriver: true }),
+      Animated.timing(contentOpacity, {
+        toValue: 1,
+        duration: 1100,
+        useNativeDriver: true,
+        easing: softEaseOut,
+      }),
+      Animated.timing(contentSlide, {
+        toValue: 0,
+        duration: 900,
+        useNativeDriver: true,
+        easing: gentleEaseOut,
+      }),
     ]).start();
   }, []);
 
   function goToNext() {
+    // Fade + slide out
     Animated.parallel([
-      Animated.timing(contentOpacity, { toValue: 0, duration: 240, useNativeDriver: true }),
-      Animated.timing(contentSlide, { toValue: -20, duration: 240, useNativeDriver: true }),
+      Animated.timing(contentOpacity, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: true,
+        easing: Easing.in(Easing.quad),
+      }),
+      Animated.timing(contentSlide, {
+        toValue: -14,
+        duration: 220,
+        useNativeDriver: true,
+        easing: Easing.in(Easing.quad),
+      }),
     ]).start(() => {
       setStep((s) => s + 1);
-      contentSlide.setValue(28);
+      contentSlide.setValue(20);
+      // Fade + slide in — pure timing, zero bounce
       Animated.parallel([
-        Animated.timing(contentOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
-        Animated.spring(contentSlide, { toValue: 0, damping: 24, stiffness: 88, useNativeDriver: true }),
+        Animated.timing(contentOpacity, {
+          toValue: 1,
+          duration: 480,
+          useNativeDriver: true,
+          easing: softEaseOut,
+        }),
+        Animated.timing(contentSlide, {
+          toValue: 0,
+          duration: 440,
+          useNativeDriver: true,
+          easing: gentleEaseOut,
+        }),
       ]).start();
     });
   }
@@ -652,54 +749,53 @@ function OnboardingInner({
       case 5:
         return (
           <FirstPregnancyStep
-            onComplete={(v) => {
-              setFirstPregValue(v);
+            onComplete={(val) => {
+              setFirstPregValue(val);
               goToNext();
             }}
           />
         );
       case 6:
-        return <BloomCompletionStep name={user.name} firstPreg={firstPregValue} />;
+        return <BloomCompletionStep name={user.name || ''} firstPreg={firstPregValue} />;
       default:
         return null;
     }
   }
 
-  const gradientColors: [string, string, string] =
-    step === 0
-      ? ['#FBF7F0', '#F7EDE4', '#F2E4D4']
-      : step === 1
-      ? ['#F8F4FC', '#F2EBF8', '#EDE4F4']
-      : step === 2
-      ? ['#F4F8F4', '#EBF3EB', '#E2EEE2']
-      : ['#FBF7F0', '#F5EDE0', '#F0E5D5'];
+  const showProgress = step <= 5;
+  const progressStep = step < 3 ? step : step - 3 + DATA_STEPS;
 
   return (
-    <LinearGradient colors={gradientColors} style={styles.container}>
+    <LinearGradient
+      colors={['#FBF7F0', '#F5EDE2', '#F0E5D5']}
+      style={styles.container}
+    >
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
           contentContainerStyle={[
-            styles.scroll,
-            { paddingTop: topPad + 24, paddingBottom: bottomPad },
+            styles.scrollContent,
+            { paddingTop: topPad + 28, paddingBottom: bottomPad },
           ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {isDataStep && (
-            <View style={styles.dotsRow}>
-              <ProgressDots total={DATA_STEPS} current={dataStepIndex} />
+          {showProgress && (
+            <View style={styles.progressWrap}>
+              <ProgressDots total={6} current={progressStep} />
             </View>
           )}
 
           <Animated.View
-            style={{
-              opacity: contentOpacity,
-              transform: [{ translateY: contentSlide }],
-              flex: 1,
-            }}
+            style={[
+              styles.stepWrap,
+              {
+                opacity: contentOpacity,
+                transform: [{ translateY: contentSlide }],
+              },
+            ]}
           >
             {renderStep()}
           </Animated.View>
@@ -713,47 +809,47 @@ function OnboardingInner({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scroll: {
+  scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 28,
   },
-  dotsRow: {
+  progressWrap: {
     alignItems: 'center',
     marginBottom: 32,
   },
+  stepWrap: {
+    flex: 1,
+  },
 
-  // Story step
+  // Story steps
   storyContainer: {
     flex: 1,
     justifyContent: 'space-between',
-    paddingBottom: 16,
+    minHeight: 480,
   },
   decorRow: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 32,
-    paddingBottom: 24,
-    flex: 0,
+    marginBottom: 32,
+    marginTop: 8,
   },
   storyContent: {
     flex: 1,
-    paddingBottom: 24,
+    justifyContent: 'center',
   },
   storyEyebrow: {
-    fontSize: 13,
+    fontSize: 12,
     color: Colors.primary,
     fontFamily: 'Inter_600SemiBold',
-    letterSpacing: 1.2,
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   storyTitle: {
     fontSize: 38,
-    fontWeight: '700',
     color: Colors.text,
     fontFamily: 'CormorantGaramond_700Bold',
-    letterSpacing: -0.8,
     lineHeight: 46,
+    letterSpacing: -0.8,
     marginBottom: 18,
   },
   storyBody: {
@@ -761,232 +857,221 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     fontFamily: 'Inter_400Regular',
     lineHeight: 28,
+    letterSpacing: 0.1,
   },
-  privacyPoints: { gap: 14, marginTop: 8 },
-  privacyRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
+  privacyPoints: { marginTop: 4, gap: 14 },
+  privacyRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   privacyDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: Colors.primarySoft,
-    marginTop: 8,
+    backgroundColor: Colors.sage,
+    opacity: 0.7,
+    marginTop: 7,
     flexShrink: 0,
   },
   privacyText: {
-    fontSize: 16,
-    color: Colors.textWarm,
-    fontFamily: 'Inter_400Regular',
-    lineHeight: 25,
     flex: 1,
+    fontSize: 15,
+    color: Colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    lineHeight: 24,
   },
 
   // Data steps
   dataContainer: {
     flex: 1,
-    justifyContent: 'flex-start',
-    paddingTop: 16,
-    paddingBottom: 24,
-    gap: 0,
+    paddingTop: 12,
+    minHeight: 440,
   },
   dataEyebrow: {
-    fontSize: 13,
+    fontSize: 12,
     color: Colors.primary,
     fontFamily: 'Inter_600SemiBold',
-    letterSpacing: 1,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
     marginBottom: 14,
   },
   dataTitle: {
     fontSize: 36,
-    fontWeight: '700',
     color: Colors.text,
     fontFamily: 'CormorantGaramond_700Bold',
-    letterSpacing: -0.6,
     lineHeight: 44,
-    marginBottom: 14,
+    letterSpacing: -0.6,
+    marginBottom: 16,
   },
   dataBody: {
     fontSize: 16,
     color: Colors.textMuted,
     fontFamily: 'Inter_400Regular',
     lineHeight: 26,
-    marginBottom: 28,
+    marginBottom: 32,
   },
   textInput: {
     backgroundColor: Colors.card,
-    borderRadius: Colors.radius.md,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
+    borderRadius: Colors.radius.lg,
     paddingHorizontal: 20,
     paddingVertical: 18,
     fontSize: 18,
     color: Colors.text,
-    fontFamily: 'CormorantGaramond_400Regular',
+    fontFamily: 'Inter_400Regular',
+    borderWidth: 1.5,
+    borderColor: Colors.border,
     marginBottom: 24,
-    letterSpacing: -0.2,
   },
   dateRow: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   dateInputWrap: { gap: 8 },
   dateLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: Colors.textSoft,
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Inter_500Medium',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
   dateInput: {
     backgroundColor: Colors.card,
     borderRadius: Colors.radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 16,
+    fontSize: 18,
+    color: Colors.text,
+    fontFamily: 'Inter_400Regular',
     borderWidth: 1.5,
     borderColor: Colors.border,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    fontSize: 20,
-    color: Colors.text,
-    fontFamily: 'CormorantGaramond_400Regular',
     textAlign: 'center',
-    letterSpacing: 1,
   },
   helperRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
+    gap: 10,
     marginBottom: 16,
     paddingHorizontal: 4,
   },
   helperRowBlocking: {},
   helperDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: Colors.textSoft,
-    marginTop: 7,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.sage,
+    marginTop: 6,
     flexShrink: 0,
   },
-  helperDotBlocking: { backgroundColor: Colors.blush },
+  helperDotBlocking: { backgroundColor: '#C47858' },
   helperText: {
+    flex: 1,
     fontSize: 13,
     color: Colors.textSoft,
     fontFamily: 'Inter_400Regular',
     lineHeight: 20,
-    flex: 1,
-    fontStyle: 'italic',
   },
-  helperTextBlocking: { color: Colors.blush },
+  helperTextBlocking: { color: '#B06040' },
   choiceRow: { gap: 12, marginTop: 8 },
   choiceButton: {
     backgroundColor: Colors.card,
     borderRadius: Colors.radius.lg,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
     paddingVertical: 20,
     paddingHorizontal: 24,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
     alignItems: 'center',
   },
   choiceButtonSelected: {
-    backgroundColor: Colors.primarySoft,
     borderColor: Colors.primary,
+    backgroundColor: Colors.primarySoft,
   },
   choiceText: {
     fontSize: 17,
     color: Colors.textWarm,
-    fontFamily: 'CormorantGaramond_600SemiBold',
-    letterSpacing: -0.2,
+    fontFamily: 'Inter_500Medium',
   },
   choiceTextSelected: { color: Colors.primary },
 
-  // Bloom completion
-  bloomContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 32,
-    position: 'relative',
-  },
-  ringsWrap: {
-    width: 220,
-    height: 220,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  ring: {
-    position: 'absolute',
-    backgroundColor: Colors.primarySoft,
-    borderRadius: 9999,
-  },
-  ring1: { width: 180, height: 180 },
-  ring2: { width: 240, height: 240 },
-  ring3: { width: 300, height: 300 },
-  bloomTextWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-    gap: 12,
-  },
-  bloomTitle: {
-    fontSize: 42,
-    fontWeight: '700',
-    color: Colors.text,
-    fontFamily: 'CormorantGaramond_700Bold',
-    letterSpacing: -1,
-    lineHeight: 50,
-    textAlign: 'center',
-  },
-  bloomSubtitle: {
-    fontSize: 16,
-    color: Colors.textMuted,
-    fontFamily: 'Inter_400Regular',
-    textAlign: 'center',
-    lineHeight: 26,
-    fontStyle: 'italic',
-  },
-
-  // Dedication overlay
-  dedicationOverlay: {
-    backgroundColor: '#FBF7F0',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 999,
-  },
-  dedicationText: {
-    fontSize: 22,
-    color: Colors.textWarm,
-    fontFamily: 'CormorantGaramond_400Regular',
-    fontStyle: 'italic',
-    letterSpacing: -0.3,
-    textAlign: 'center',
-    lineHeight: 34,
-  },
-
-  // Shared CTA button
+  // Primary button
   primaryButton: {
     backgroundColor: Colors.primary,
     borderRadius: Colors.radius.full,
-    paddingVertical: 18,
+    paddingVertical: 20,
     alignItems: 'center',
-    width: '100%',
-    marginTop: 12,
+    marginTop: 28,
     shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.24,
-    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 18,
     elevation: 6,
   },
-  primaryButtonDisabled: { opacity: 0.48 },
+  primaryButtonDisabled: {
+    backgroundColor: Colors.peach,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
   primaryButtonText: {
     color: Colors.white,
     fontSize: 17,
     fontFamily: 'Inter_600SemiBold',
     fontWeight: '600',
-    letterSpacing: 0.2,
+    letterSpacing: 0.3,
+  },
+
+  // Bloom completion
+  bloomContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 520,
+    paddingTop: 20,
+  },
+  ringsWrap: {
+    width: 240,
+    height: 240,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 48,
+  },
+  ring: {
+    position: 'absolute',
+    borderRadius: 999,
+    backgroundColor: Colors.primary,
+  },
+  ring1: { width: 180, height: 180 },
+  ring2: { width: 220, height: 220 },
+  ring3: { width: 260, height: 260 },
+  bloomTextWrap: {
+    alignItems: 'center',
+    marginBottom: 48,
+    paddingHorizontal: 8,
+  },
+  bloomTitle: {
+    fontSize: 36,
+    color: Colors.text,
+    fontFamily: 'CormorantGaramond_700Bold',
+    lineHeight: 46,
+    letterSpacing: -0.6,
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  bloomSubtitle: {
+    fontSize: 16,
+    color: Colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    lineHeight: 26,
+    textAlign: 'center',
+  },
+  dedicationOverlay: {
+    backgroundColor: '#FBF7F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  dedicationText: {
+    fontSize: 28,
+    color: Colors.textWarm,
+    fontFamily: 'CormorantGaramond_400Regular',
+    fontStyle: 'italic',
+    letterSpacing: -0.3,
+    textAlign: 'center',
   },
 });

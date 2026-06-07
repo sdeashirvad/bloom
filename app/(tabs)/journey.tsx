@@ -8,11 +8,13 @@ import {
   Animated,
   Platform,
   RefreshControl,
+  Easing,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/colors';
 import { AmbientOrb } from '@/components/AmbientOrb';
@@ -26,7 +28,9 @@ import {
 } from '@/stores/reflectionStore';
 import { ReflectionEntry, MilestoneTag } from '@/types/reflection';
 
-// ─── Milestone detection (system milestones) ──────────────────────────────────
+const softEaseOut = Easing.out(Easing.cubic);
+
+// ─── Milestone detection ──────────────────────────────────────────────────────
 
 type SystemMilestone = { week: number; label: string; note: string };
 
@@ -47,12 +51,22 @@ function getMilestoneForGroup(entries: ReflectionEntry[]): SystemMilestone | nul
 
 function EmptyState({ onCapture }: { onCapture: () => void }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(18)).current;
+  const slideAnim = useRef(new Animated.Value(16)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 560, useNativeDriver: true }),
-      Animated.spring(slideAnim, { toValue: 0, damping: 24, stiffness: 88, useNativeDriver: true }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+        easing: softEaseOut,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 560,
+        useNativeDriver: true,
+        easing: softEaseOut,
+      }),
     ]).start();
   }, []);
 
@@ -137,12 +151,22 @@ function KeptCloseSection({
   onSetMilestone: (id: string, tag: MilestoneTag | null) => void;
 }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(14)).current;
+  const slideAnim = useRef(new Animated.Value(12)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.spring(slideAnim, { toValue: 0, damping: 24, stiffness: 88, useNativeDriver: true }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 520,
+        useNativeDriver: true,
+        easing: softEaseOut,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 480,
+        useNativeDriver: true,
+        easing: softEaseOut,
+      }),
     ]).start();
   }, []);
 
@@ -194,32 +218,49 @@ export default function JourneyScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const headerFade = useRef(new Animated.Value(0)).current;
-  const headerSlide = useRef(new Animated.Value(22)).current;
+  const headerSlide = useRef(new Animated.Value(18)).current;
 
   const topPad = insets.top + (Platform.OS === 'web' ? 67 : 0);
-  const bottomPad = Platform.OS === 'web' ? 34 : 0;
+  const bottomPad = insets.bottom + (Platform.OS === 'web' ? 34 : 20);
 
-  async function loadReflections() {
+  const loadReflections = useCallback(async () => {
     const all = await getAllReflections();
     setAllEntries(all);
     setGroups(groupReflectionsByMonth(all));
     setKeptCloseEntries(all.filter((e) => e.keptClose === true));
     setLoaded(true);
-  }
+  }, []);
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(headerFade, { toValue: 1, duration: 600, useNativeDriver: true }),
-      Animated.spring(headerSlide, { toValue: 0, damping: 24, stiffness: 88, useNativeDriver: true }),
+      Animated.timing(headerFade, {
+        toValue: 1,
+        duration: 640,
+        useNativeDriver: true,
+        easing: softEaseOut,
+      }),
+      Animated.timing(headerSlide, {
+        toValue: 0,
+        duration: 580,
+        useNativeDriver: true,
+        easing: softEaseOut,
+      }),
     ]).start();
     loadReflections();
   }, []);
+
+  // Refresh data every time this tab gains focus — catches saves from mood screen
+  useFocusEffect(
+    useCallback(() => {
+      loadReflections();
+    }, [loadReflections])
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadReflections();
     setRefreshing(false);
-  }, []);
+  }, [loadReflections]);
 
   function handleCapture() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -246,14 +287,14 @@ export default function JourneyScreen() {
       <AmbientOrb
         size={240}
         color={Colors.peachLight}
-        opacity={0.22}
+        opacity={0.20}
         phaseSeed={0.15}
         style={{ top: -100, right: -80 }}
       />
       <AmbientOrb
         size={170}
         color={Colors.lavenderLight}
-        opacity={0.14}
+        opacity={0.12}
         phaseSeed={0.7}
         style={{ bottom: 200, left: -60 }}
       />
@@ -261,7 +302,7 @@ export default function JourneyScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
-          { paddingTop: topPad + 28, paddingBottom: bottomPad + 120 },
+          { paddingTop: topPad + 28, paddingBottom: bottomPad + 130 },
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -294,7 +335,6 @@ export default function JourneyScreen() {
           <EmptyState onCapture={handleCapture} />
         ) : (
           <>
-            {/* "Moments kept close" — only when at least one entry is kept */}
             {hasKeptClose && (
               <KeptCloseSection
                 entries={keptCloseEntries}
@@ -303,7 +343,6 @@ export default function JourneyScreen() {
               />
             )}
 
-            {/* Main timeline */}
             <View style={styles.timeline}>
               {groups.map((group, groupIndex) => {
                 const systemMilestone = getMilestoneForGroup(group.entries);
@@ -360,7 +399,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  // Privacy nudge
   privacyNudge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -416,7 +454,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_500Medium',
   },
 
-  // "Moments kept close" section
   keptCloseHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -552,7 +589,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 36,
     shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.26,
+    shadowOpacity: 0.24,
     shadowRadius: 14,
     elevation: 5,
   },

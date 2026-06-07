@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,12 @@ import {
   Animated,
   TouchableOpacity,
   Platform,
+  Easing,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/colors';
 import { BloomCard } from '@/components/BloomCard';
@@ -25,7 +27,6 @@ import {
   GREETING_BY_TIME,
   getPersonalMemory,
   getTrimester,
-  getCompanionNote,
 } from '@/constants/emotionalContent';
 import {
   getTimeOfDay,
@@ -34,12 +35,17 @@ import {
   TRIMESTER_HERO_GRADIENTS,
   TRIMESTER_HERO_SHADOW,
 } from '@/constants/timeOfDay';
-import { getReflectionsByWeek, ReflectionGroup } from '@/stores/reflectionStore';
+import {
+  getTodaysReflection,
+  getReflectionsByWeek,
+} from '@/stores/reflectionStore';
 import { ReflectionEntry } from '@/types/reflection';
+
+const softEaseOut = Easing.out(Easing.cubic);
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function StaggeredCard({
+function FadeCard({
   children,
   delay,
   style,
@@ -49,13 +55,23 @@ function StaggeredCard({
   style?: object;
 }) {
   const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(18)).current;
+  const translateY = useRef(new Animated.Value(14)).current;
 
   useEffect(() => {
     const t = setTimeout(() => {
       Animated.parallel([
-        Animated.timing(opacity, { toValue: 1, duration: 520, useNativeDriver: true }),
-        Animated.spring(translateY, { toValue: 0, damping: 24, stiffness: 88, useNativeDriver: true }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 560,
+          useNativeDriver: true,
+          easing: softEaseOut,
+        }),
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+          easing: softEaseOut,
+        }),
       ]).start();
     }, delay);
     return () => clearTimeout(t);
@@ -81,8 +97,13 @@ function MemoryLine({
 
   useEffect(() => {
     const t = setTimeout(() => {
-      Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }).start();
-    }, 400);
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 900,
+        useNativeDriver: true,
+        easing: softEaseOut,
+      }).start();
+    }, 350);
     return () => clearTimeout(t);
   }, []);
 
@@ -116,13 +137,23 @@ function BreathingHeroCard({
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(breathAnim, { toValue: 1, duration: 4400, useNativeDriver: true }),
-        Animated.timing(breathAnim, { toValue: 0, duration: 4400, useNativeDriver: true }),
+        Animated.timing(breathAnim, {
+          toValue: 1,
+          duration: 5000,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.sin),
+        }),
+        Animated.timing(breathAnim, {
+          toValue: 0,
+          duration: 5000,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.sin),
+        }),
       ])
     ).start();
   }, []);
 
-  const heroScale = breathAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.006] });
+  const heroScale = breathAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.004] });
   const weeksLeft = Math.max(0, 40 - week);
 
   return (
@@ -163,92 +194,153 @@ function BreathingHeroCard({
   );
 }
 
-// ─── "This week in your journey" widget ──────────────────────────────────────
+// ─── Today's check-in CTA — the emotional core of Home ───────────────────────
 
 const MOOD_ICONS: Record<string, string> = {
   calm: '🌿', tired: '🌙', emotional: '🌊', anxious: '🍃', happy: '☀️',
 };
+const MOOD_DISPLAY: Record<string, string> = {
+  calm: 'calm', tired: 'tired', emotional: 'tender', anxious: 'unsettled', happy: 'joyful',
+};
 
-function ThisWeekWidget({
-  week,
-  onCapture,
+function TodayCheckinCard({
+  todaysEntry,
+  onCheckin,
 }: {
-  week: number;
-  onCapture: () => void;
+  todaysEntry: ReflectionEntry | null;
+  onCheckin: () => void;
 }) {
-  const [weekEntries, setWeekEntries] = useState<ReflectionEntry[] | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(12)).current;
 
   useEffect(() => {
-    getReflectionsByWeek(week).then((entries) => {
-      setWeekEntries(entries);
-      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
-    });
-  }, [week]);
+    const t = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+          easing: softEaseOut,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 550,
+          useNativeDriver: true,
+          easing: softEaseOut,
+        }),
+      ]).start();
+    }, 260);
+    return () => clearTimeout(t);
+  }, [todaysEntry?.id]);
 
-  if (weekEntries === null) return null;
+  if (!todaysEntry) {
+    // Primary emotional CTA — no check-in today
+    return (
+      <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+        <TouchableOpacity
+          style={styles.checkinCTA}
+          onPress={onCheckin}
+          activeOpacity={0.88}
+          accessibilityRole="button"
+          accessibilityLabel="How are you feeling today? Open mood check-in"
+        >
+          <LinearGradient colors={['#FDF0EA', '#F7E4D4']} style={styles.checkinCTAInner}>
+            <View style={styles.checkinCTADecor} />
+            <View style={styles.checkinCTAContent}>
+              <Text style={styles.checkinCTAEyebrow}>A moment for you</Text>
+              <Text style={styles.checkinCTATitle}>How are you{'\n'}feeling today?</Text>
+              <View style={styles.checkinCTAButton}>
+                <Text style={styles.checkinCTAButtonText}>Check in</Text>
+                <Ionicons name="chevron-forward" size={14} color={Colors.primary} />
+              </View>
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  }
 
-  // Most recent reflection this week
-  const latest = weekEntries[0] ?? null;
+  // Checked in today — show gentle status
+  const moodIcon = MOOD_ICONS[todaysEntry.mood] ?? '🌿';
+  const moodWord = MOOD_DISPLAY[todaysEntry.mood] ?? todaysEntry.mood;
 
   return (
-    <Animated.View style={{ opacity: fadeAnim }}>
-      <Text style={styles.sectionTitle}>This week in your journey</Text>
-      {latest ? (
-        <View style={styles.weekCard}>
-          <View style={styles.weekCardDecor} />
-          <View style={styles.weekCardHeader}>
-            <View style={styles.weekMoodPill}>
-              <Text style={styles.weekMoodIcon}>{MOOD_ICONS[latest.mood] ?? '🌿'}</Text>
-              <Text style={styles.weekMoodLabel}>
-                {latest.mood.charAt(0).toUpperCase() + latest.mood.slice(1)}
-              </Text>
-            </View>
-            {latest.keptClose ? (
-              <Text style={styles.weekKeptClose}>❤ Kept close</Text>
-            ) : null}
-            {latest.milestoneTag ? (
-              <Text style={styles.weekMilestone}>✦ {latest.milestoneTag}</Text>
-            ) : null}
-          </View>
-          {latest.userReflection ? (
-            <Text style={styles.weekReflection} numberOfLines={3}>
-              "{latest.userReflection}"
-            </Text>
-          ) : (
-            <Text style={styles.weekBloomReply} numberOfLines={3}>
-              {latest.bloomReply}
-            </Text>
-          )}
-          <View style={styles.weekCardFooter}>
-            <Text style={styles.weekCardDate}>
-              {new Date(latest.createdAt).toLocaleDateString('en-US', {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-              })}
-            </Text>
+    <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+      <View style={styles.checkinStatus}>
+        <View style={styles.checkinStatusLeft}>
+          <Text style={styles.checkinStatusIcon}>{moodIcon}</Text>
+          <View>
+            <Text style={styles.checkinStatusLabel}>You checked in today</Text>
+            <Text style={styles.checkinStatusMood}>Feeling {moodWord}</Text>
           </View>
         </View>
-      ) : (
         <TouchableOpacity
-          style={styles.weekEmptyCard}
-          onPress={onCapture}
-          activeOpacity={0.82}
+          onPress={onCheckin}
+          activeOpacity={0.75}
+          style={styles.checkinStatusAddBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Add another reflection"
         >
-          <View style={styles.weekEmptyInner}>
-            <View style={styles.weekEmptyOrb} />
-            <Text style={styles.weekEmptyText}>
-              A quiet week so far.
-            </Text>
-            <View style={styles.weekEmptyCTA}>
-              <Text style={styles.weekEmptyCTAText}>Check in today</Text>
-              <Ionicons name="chevron-forward" size={13} color={Colors.primary} />
-            </View>
-          </View>
+          <Text style={styles.checkinStatusAddText}>Reflect more</Text>
         </TouchableOpacity>
-      )}
+      </View>
     </Animated.View>
+  );
+}
+
+// ─── This week's latest reflection ───────────────────────────────────────────
+
+function ThisWeekWidget({
+  weekEntries,
+  onCapture,
+}: {
+  weekEntries: ReflectionEntry[] | null;
+  onCapture: () => void;
+}) {
+  if (weekEntries === null) return null;
+
+  const latest = weekEntries[0] ?? null;
+  if (!latest) return null;
+
+  return (
+    <View>
+      <Text style={styles.sectionTitle}>This week</Text>
+      <View style={styles.weekCard}>
+        <View style={styles.weekCardDecor} />
+        <View style={styles.weekCardHeader}>
+          <View style={styles.weekMoodPill}>
+            <Text style={styles.weekMoodIcon}>{MOOD_ICONS[latest.mood] ?? '🌿'}</Text>
+            <Text style={styles.weekMoodLabel}>
+              {latest.mood.charAt(0).toUpperCase() + latest.mood.slice(1)}
+            </Text>
+          </View>
+          {latest.keptClose ? (
+            <Text style={styles.weekKeptClose}>❤ Kept close</Text>
+          ) : null}
+          {latest.milestoneTag ? (
+            <Text style={styles.weekMilestone}>✦ {latest.milestoneTag}</Text>
+          ) : null}
+        </View>
+        {latest.userReflection ? (
+          <Text style={styles.weekReflection} numberOfLines={3}>
+            "{latest.userReflection}"
+          </Text>
+        ) : (
+          <Text style={styles.weekMoodOnly} numberOfLines={2}>
+            A quiet moment.
+          </Text>
+        )}
+        <View style={styles.weekCardFooter}>
+          <Text style={styles.weekCardDate}>
+            {new Date(latest.createdAt).toLocaleDateString('en-US', {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+            })}
+          </Text>
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -259,10 +351,13 @@ export default function HomeScreen() {
   const router = useRouter();
   const { user, pregnancyWeek, daysAlong } = useBloom();
 
+  const [todaysEntry, setTodaysEntry] = useState<ReflectionEntry | null>(null);
+  const [weekEntries, setWeekEntries] = useState<ReflectionEntry[] | null>(null);
+  const [dataLoaded, setDataLoaded] = useState(false);
+
   const week = pregnancyWeek || 18;
   const weekData = getWeekData(week);
   const affirmation = getDailyAffirmation(week);
-  const companionNote = getCompanionNote(week);
   const greeting = GREETING_BY_TIME();
   const trimester = getTrimester(week);
   const timeOfDay = getTimeOfDay();
@@ -271,7 +366,30 @@ export default function HomeScreen() {
   const totalDays = week * 7 + (daysAlong || 0);
 
   const topPad = insets.top + (Platform.OS === 'web' ? 67 : 0);
-  const bottomPad = Platform.OS === 'web' ? 34 : 0;
+  const bottomPad = insets.bottom + (Platform.OS === 'web' ? 34 : 20);
+
+  // Load data — refetch every time this tab gains focus
+  const loadData = useCallback(async () => {
+    const [todayEntry, entries] = await Promise.all([
+      getTodaysReflection(),
+      getReflectionsByWeek(week),
+    ]);
+    setTodaysEntry(todayEntry);
+    setWeekEntries(entries);
+    setDataLoaded(true);
+  }, [week]);
+
+  // Initial load
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Refresh on every focus — catches saves from mood tab
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   function handleMoodCapture() {
     router.push('/(tabs)/mood');
@@ -279,19 +397,19 @@ export default function HomeScreen() {
 
   return (
     <LinearGradient colors={bgGradient} style={styles.container}>
-      <AmbientOrb size={260} color={orbColors[0]} opacity={0.18} phaseSeed={0} style={{ top: -100, right: -90 }} />
-      <AmbientOrb size={180} color={orbColors[1]} opacity={0.16} phaseSeed={0.5} style={{ bottom: 260, left: -70 }} />
-      <AmbientOrb size={120} color={orbColors[2]} opacity={0.13} phaseSeed={0.75} style={{ top: 340, right: -40 }} />
+      <AmbientOrb size={260} color={orbColors[0]} opacity={0.16} phaseSeed={0} style={{ top: -100, right: -90 }} />
+      <AmbientOrb size={180} color={orbColors[1]} opacity={0.14} phaseSeed={0.5} style={{ bottom: 260, left: -70 }} />
+      <AmbientOrb size={110} color={orbColors[2]} opacity={0.11} phaseSeed={0.75} style={{ top: 360, right: -40 }} />
 
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
-          { paddingTop: topPad + 28, paddingBottom: bottomPad + 110 },
+          { paddingTop: topPad + 28, paddingBottom: bottomPad + 130 },
         ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
-        <StaggeredCard delay={0}>
+        <FadeCard delay={0}>
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               <Text style={styles.greeting}>
@@ -311,58 +429,54 @@ export default function HomeScreen() {
               </LinearGradient>
             </View>
           </View>
-        </StaggeredCard>
+        </FadeCard>
 
         {/* Trimester badge */}
-        <StaggeredCard delay={80}>
+        <FadeCard delay={80}>
           <TrimesterBadge week={week} />
-        </StaggeredCard>
+        </FadeCard>
 
         {/* Personal memory line */}
         <MemoryLine user={user} week={week} totalDays={totalDays} />
 
-        {/* Breathing hero card */}
-        <StaggeredCard delay={180}>
-          <BreathingHeroCard week={week} totalDays={totalDays} daysAlong={daysAlong || 0} trimester={trimester} />
-        </StaggeredCard>
+        {/* Week hero card */}
+        <FadeCard delay={160}>
+          <BreathingHeroCard
+            week={week}
+            totalDays={totalDays}
+            daysAlong={daysAlong || 0}
+            trimester={trimester}
+          />
+        </FadeCard>
+
+        {/* ── Emotional core: mood CTA or check-in status ── */}
+        {dataLoaded && (
+          <TodayCheckinCard
+            todaysEntry={todaysEntry}
+            onCheckin={handleMoodCapture}
+          />
+        )}
 
         {/* Affirmation */}
-        <StaggeredCard delay={280}>
+        <FadeCard delay={340}>
           <View style={styles.affirmationCard}>
             <View style={styles.affirmationInner}>
               <Text style={styles.affirmationQuote}>"</Text>
               <Text style={styles.affirmationText}>{affirmation}</Text>
             </View>
           </View>
-        </StaggeredCard>
+        </FadeCard>
 
-        {/* Companion note */}
-        <StaggeredCard delay={330}>
-          <LinearGradient colors={['#FDF5EE', '#F8EDE0']} style={styles.companionNote}>
-            <Text style={styles.companionMark}>✦</Text>
-            <Text style={styles.companionText}>{companionNote}</Text>
-          </LinearGradient>
-        </StaggeredCard>
+        {/* This week's reflection — only shown if they have entries */}
+        {dataLoaded && weekEntries && weekEntries.length > 0 && (
+          <FadeCard delay={420}>
+            <ThisWeekWidget weekEntries={weekEntries} onCapture={handleMoodCapture} />
+          </FadeCard>
+        )}
 
-        {/* Emotional note */}
-        <StaggeredCard delay={380}>
-          <LinearGradient colors={['#FDF5EE', '#F8EAE0']} style={styles.emotionalNote}>
-            <View style={styles.emotionalNoteDecor} />
-            <Text style={styles.emotionalNoteText}>{weekData.emotionalNote}</Text>
-          </LinearGradient>
-        </StaggeredCard>
-
-        {/* This week in your journey */}
-        <StaggeredCard delay={430}>
-          <ThisWeekWidget week={week} onCapture={handleMoodCapture} />
-        </StaggeredCard>
-
-        {/* Today for you */}
-        <StaggeredCard delay={500}>
+        {/* One daily insight */}
+        <FadeCard delay={500}>
           <Text style={[styles.sectionTitle, { marginTop: 8 }]}>For you today</Text>
-        </StaggeredCard>
-
-        <StaggeredCard delay={560}>
           <BloomCard style={styles.insightCard} variant="white" padding={22}>
             <View style={styles.insightRow}>
               <View style={[styles.insightIcon, { backgroundColor: Colors.lavenderLight }]}>
@@ -374,24 +488,10 @@ export default function HomeScreen() {
               </View>
             </View>
           </BloomCard>
-        </StaggeredCard>
+        </FadeCard>
 
-        <StaggeredCard delay={610}>
-          <BloomCard style={styles.insightCard} variant="white" padding={22}>
-            <View style={styles.insightRow}>
-              <View style={[styles.insightIcon, { backgroundColor: Colors.sageLight }]}>
-                <Ionicons name="leaf-outline" size={18} color={Colors.sage} />
-              </View>
-              <View style={styles.insightContent}>
-                <Text style={styles.insightLabel}>Gentle reminder</Text>
-                <Text style={styles.insightText}>{weekData.selfCareTip}</Text>
-              </View>
-            </View>
-          </BloomCard>
-        </StaggeredCard>
-
-        {/* Quick links */}
-        <StaggeredCard delay={660}>
+        {/* Navigation */}
+        <FadeCard delay={580}>
           <Text style={[styles.sectionTitle, { marginTop: 8 }]}>Around Bloom</Text>
           <View style={styles.quickRow}>
             <TouchableOpacity
@@ -411,21 +511,21 @@ export default function HomeScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.quickCard}
-              onPress={handleMoodCapture}
+              onPress={() => router.push('/(tabs)/journey')}
               activeOpacity={0.82}
               accessibilityRole="button"
-              accessibilityLabel="Mood check — how are you today?"
+              accessibilityLabel="Journey — your memories"
             >
               <LinearGradient colors={['#FDF0EA', '#F8E5D8']} style={styles.quickGradient}>
                 <View style={[styles.quickIconWrap, { backgroundColor: Colors.peachLight }]}>
                   <Ionicons name="sunny" size={18} color={Colors.primary} />
                 </View>
-                <Text style={styles.quickLabel}>Mood check</Text>
-                <Text style={styles.quickSub}>How are you today?</Text>
+                <Text style={styles.quickLabel}>Journey</Text>
+                <Text style={styles.quickSub}>Your memories</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
-        </StaggeredCard>
+        </FadeCard>
       </ScrollView>
     </LinearGradient>
   );
@@ -463,7 +563,7 @@ const styles = StyleSheet.create({
     marginLeft: 16,
     shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
+    shadowOpacity: 0.15,
     shadowRadius: 10,
     elevation: 4,
   },
@@ -501,9 +601,9 @@ const styles = StyleSheet.create({
 
   heroCardWrap: {
     borderRadius: Colors.radius.xl,
-    marginBottom: 14,
+    marginBottom: 18,
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.26,
+    shadowOpacity: 0.24,
     shadowRadius: 24,
     elevation: 10,
   },
@@ -566,11 +666,117 @@ const styles = StyleSheet.create({
   heroBabySize: { fontSize: 24, color: '#FFF', fontWeight: '600', fontFamily: 'CormorantGaramond_600SemiBold', letterSpacing: -0.3 },
   heroBabyDetail: { fontSize: 13, color: 'rgba(255,255,255,0.58)', fontFamily: 'Inter_400Regular', lineHeight: 18 },
 
+  // ── Today check-in CTA (no check-in) ──
+  checkinCTA: {
+    borderRadius: Colors.radius.xl,
+    marginBottom: 18,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 4,
+  },
+  checkinCTAInner: {
+    borderRadius: Colors.radius.xl,
+    padding: 26,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  checkinCTADecor: {
+    position: 'absolute',
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: 'rgba(212,136,112,0.07)',
+    bottom: -60,
+    right: -40,
+  },
+  checkinCTAContent: { gap: 10 },
+  checkinCTAEyebrow: {
+    fontSize: 11,
+    color: Colors.primary,
+    fontFamily: 'Inter_600SemiBold',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    opacity: 0.8,
+  },
+  checkinCTATitle: {
+    fontSize: 28,
+    color: Colors.textWarm,
+    fontFamily: 'CormorantGaramond_700Bold',
+    lineHeight: 36,
+    letterSpacing: -0.4,
+  },
+  checkinCTAButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+  },
+  checkinCTAButtonText: {
+    fontSize: 15,
+    color: Colors.primary,
+    fontFamily: 'Inter_600SemiBold',
+    letterSpacing: 0.2,
+  },
+
+  // ── Today check-in status (checked in) ──
+  checkinStatus: {
+    backgroundColor: Colors.card,
+    borderRadius: Colors.radius.xl,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    marginBottom: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    shadowColor: Colors.shadow.color,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  checkinStatusLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    flex: 1,
+  },
+  checkinStatusIcon: { fontSize: 24 },
+  checkinStatusLabel: {
+    fontSize: 12,
+    color: Colors.textSoft,
+    fontFamily: 'Inter_400Regular',
+    letterSpacing: 0.1,
+    marginBottom: 2,
+  },
+  checkinStatusMood: {
+    fontSize: 16,
+    color: Colors.textWarm,
+    fontFamily: 'CormorantGaramond_600SemiBold',
+    letterSpacing: -0.2,
+  },
+  checkinStatusAddBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: Colors.radius.full,
+    backgroundColor: Colors.primarySoft,
+  },
+  checkinStatusAddText: {
+    fontSize: 12,
+    color: Colors.primary,
+    fontFamily: 'Inter_500Medium',
+    letterSpacing: 0.1,
+  },
+
+  // Affirmation
   affirmationCard: {
-    marginBottom: 12,
+    marginBottom: 18,
     shadowColor: '#3D2B1F',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.04,
     shadowRadius: 12,
     elevation: 2,
   },
@@ -597,39 +803,16 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
 
-  emotionalNote: {
-    borderRadius: Colors.radius.xl,
-    padding: 24,
-    marginBottom: 28,
-    overflow: 'hidden',
-  },
-  emotionalNoteDecor: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(212,136,112,0.06)',
-    bottom: -40,
-    right: -30,
-  },
-  emotionalNoteText: {
-    fontSize: 20,
-    color: Colors.textWarm,
-    fontFamily: 'CormorantGaramond_600SemiBold',
-    lineHeight: 30,
-    letterSpacing: -0.2,
-  },
-
   // ── This week widget ──
   weekCard: {
     backgroundColor: Colors.card,
     borderRadius: Colors.radius.xl,
     padding: 20,
-    marginBottom: 28,
+    marginBottom: 24,
     overflow: 'hidden',
     shadowColor: Colors.shadow.color,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.055,
+    shadowOpacity: 0.05,
     shadowRadius: 14,
     elevation: 3,
   },
@@ -685,85 +868,48 @@ const styles = StyleSheet.create({
     letterSpacing: -0.1,
     marginBottom: 12,
   },
-  weekBloomReply: {
-    fontSize: 14,
-    color: Colors.textMuted,
+  weekMoodOnly: {
+    fontSize: 15,
+    color: Colors.textSoft,
     fontFamily: 'Inter_400Regular',
-    lineHeight: 22,
     fontStyle: 'italic',
+    lineHeight: 22,
     marginBottom: 12,
   },
-  weekCardFooter: {
-    borderTopWidth: 1,
-    borderTopColor: Colors.borderLight,
-    paddingTop: 10,
-    marginTop: 2,
-  },
+  weekCardFooter: {},
   weekCardDate: {
     fontSize: 11,
-    color: Colors.textSoft,
+    color: Colors.textLight,
     fontFamily: 'Inter_400Regular',
     letterSpacing: 0.2,
   },
 
-  weekEmptyCard: {
-    backgroundColor: Colors.card,
-    borderRadius: Colors.radius.xl,
-    marginBottom: 28,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    borderStyle: 'dashed',
-    overflow: 'hidden',
-  },
-  weekEmptyInner: {
-    padding: 22,
-    alignItems: 'center',
-    position: 'relative',
-  },
-  weekEmptyOrb: {
-    position: 'absolute',
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Colors.peachLight,
-    opacity: 0.3,
-    top: -20,
-    right: -10,
-  },
-  weekEmptyText: {
-    fontSize: 14,
-    color: Colors.textSoft,
-    fontFamily: 'Inter_400Regular',
-    fontStyle: 'italic',
-    marginBottom: 14,
-    textAlign: 'center',
-  },
-  weekEmptyCTA: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  weekEmptyCTAText: {
-    fontSize: 14,
-    color: Colors.primary,
-    fontFamily: 'Inter_500Medium',
-  },
-
   sectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 12,
     color: Colors.textSoft,
-    letterSpacing: 1.5,
+    fontFamily: 'Inter_600SemiBold',
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
     marginBottom: 14,
-    fontFamily: 'Inter_600SemiBold',
   },
-  insightCard: { marginBottom: 10 },
-  insightRow: { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
+
+  insightCard: {
+    marginBottom: 24,
+    shadowColor: Colors.shadow.color,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  insightRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
+  },
   insightIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -772,46 +918,22 @@ const styles = StyleSheet.create({
   insightLabel: {
     fontSize: 11,
     color: Colors.textSoft,
-    fontWeight: '600',
-    fontFamily: 'Inter_600SemiBold',
-    letterSpacing: 0.8,
+    fontFamily: 'Inter_500Medium',
+    letterSpacing: 0.6,
     textTransform: 'uppercase',
   },
   insightText: {
     fontSize: 15,
     color: Colors.textWarm,
-    lineHeight: 23,
     fontFamily: 'Inter_400Regular',
+    lineHeight: 22,
   },
 
-  companionNote: {
-    borderRadius: Colors.radius.xl,
-    paddingVertical: 22,
-    paddingHorizontal: 24,
-    marginBottom: 14,
-    overflow: 'hidden',
+  // Quick links
+  quickRow: {
     flexDirection: 'row',
-    gap: 14,
-    alignItems: 'flex-start',
+    gap: 12,
   },
-  companionMark: {
-    fontSize: 13,
-    color: Colors.primarySoft,
-    lineHeight: 28,
-    marginTop: 3,
-    flexShrink: 0,
-  },
-  companionText: {
-    flex: 1,
-    fontSize: 17,
-    color: Colors.textWarm,
-    fontFamily: 'CormorantGaramond_400Regular',
-    lineHeight: 26,
-    letterSpacing: -0.1,
-    fontStyle: 'italic',
-  },
-
-  quickRow: { flexDirection: 'row', gap: 12 },
   quickCard: {
     flex: 1,
     borderRadius: Colors.radius.xl,
@@ -819,10 +941,13 @@ const styles = StyleSheet.create({
     shadowColor: Colors.shadow.color,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
-    shadowRadius: 14,
+    shadowRadius: 12,
     elevation: 3,
   },
-  quickGradient: { padding: 20, gap: 10, alignItems: 'flex-start' },
+  quickGradient: {
+    padding: 20,
+    gap: 10,
+  },
   quickIconWrap: {
     width: 38,
     height: 38,
@@ -832,15 +957,15 @@ const styles = StyleSheet.create({
   },
   quickLabel: {
     fontSize: 15,
-    fontWeight: '700',
     color: Colors.textWarm,
-    fontFamily: 'CormorantGaramond_700Bold',
-    letterSpacing: -0.2,
+    fontFamily: 'Inter_600SemiBold',
+    fontWeight: '600',
+    letterSpacing: -0.1,
+    marginTop: 4,
   },
   quickSub: {
     fontSize: 12,
     color: Colors.textSoft,
     fontFamily: 'Inter_400Regular',
-    lineHeight: 17,
   },
 });
