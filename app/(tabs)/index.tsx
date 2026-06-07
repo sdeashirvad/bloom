@@ -379,12 +379,7 @@ export default function HomeScreen() {
     setDataLoaded(true);
   }, [week]);
 
-  // Initial load
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  // Refresh on every focus — catches saves from mood tab
+  // Refresh on focus (including initial mount) — catches saves from mood tab
   useFocusEffect(
     useCallback(() => {
       loadData();

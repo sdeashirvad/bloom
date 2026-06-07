@@ -246,10 +246,9 @@ export default function JourneyScreen() {
         easing: softEaseOut,
       }),
     ]).start();
-    loadReflections();
   }, []);
 
-  // Refresh data every time this tab gains focus — catches saves from mood screen
+  // Refresh on focus (including initial mount) — catches saves from mood screen
   useFocusEffect(
     useCallback(() => {
       loadReflections();

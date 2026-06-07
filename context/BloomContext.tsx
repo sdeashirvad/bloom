@@ -116,17 +116,10 @@ export function BloomProvider({ children }: { children: ReactNode }) {
    * Writes to storage after the state update settles.
    */
   const updateUser = useCallback(async (updates: Partial<BloomUser>) => {
-    let merged: BloomUser = defaultUser;
     setUser((prev) => {
-      merged = { ...prev, ...updates };
+      const merged = { ...prev, ...updates };
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged)).catch(() => {});
       return merged;
-    });
-    // Small timeout to let setState flush before we read the merged value
-    await new Promise<void>((r) => setTimeout(r, 0));
-    setUser((current) => {
-      // Persist the very latest state (handles any interleaved updates)
-      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(current)).catch(() => {});
-      return current;
     });
   }, []);
 

@@ -167,13 +167,6 @@ async function generate() {
     .toFile('./assets/images/icon.png');
   console.log('✓ assets/images/icon.png');
 
-  // Root icon (used by some Expo tooling)
-  await sharp(iconBuffer)
-    .resize(1024, 1024)
-    .png({ quality: 100, compressionLevel: 9 })
-    .toFile('./assets/icon.png');
-  console.log('✓ assets/icon.png');
-
   // Android adaptive icon foreground (transparent bg, safe-zone scaled)
   const fgBuffer = Buffer.from(foregroundSvg);
   await sharp(fgBuffer)
