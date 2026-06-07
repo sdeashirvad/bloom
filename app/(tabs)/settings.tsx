@@ -24,7 +24,7 @@ import { MemoryBookInput } from '@/utils/memoryBookHtml';
 const TRIMESTER_NOTES: Record<1 | 2 | 3, string> = {
   1: 'First trimester — the quiet beginning.',
   2: 'Second trimester — coming alive.',
-  3: 'Third trimester — almost there.',
+  3: 'Third trimester — the final stretch.',
 };
 
 // ─── Privacy points ───────────────────────────────────────────────────────────
@@ -80,7 +80,7 @@ function ClearModal({
     if (visible) {
       Animated.parallel([
         Animated.timing(opacityAnim, { toValue: 1, duration: 260, useNativeDriver: true }),
-        Animated.spring(scaleAnim, { toValue: 1, damping: 20, stiffness: 120, useNativeDriver: true }),
+        Animated.spring(scaleAnim, { toValue: 1, damping: 24, stiffness: 88, useNativeDriver: true }),
       ]).start();
     } else {
       scaleAnim.setValue(0.88);
@@ -378,7 +378,7 @@ export default function SettingsScreen() {
         <Animated.View style={[styles.footer, { opacity: card2Fade }]}>
           <Text style={styles.footerPrivacyLine}>Your journey stays with you.</Text>
           <Text style={styles.footerText}>Bloom · Version 1.0</Text>
-          <Text style={styles.footerSub}>Made with care, for you.</Text>
+          <Text style={styles.footerSub}>Made with care.</Text>
         </Animated.View>
       </ScrollView>
 

@@ -106,7 +106,7 @@ export default function ExportModal({ visible, input, onClose }: ExportModalProp
       setErrorMsg('');
       Animated.parallel([
         Animated.timing(opacityAnim, { toValue: 1, duration: 280, useNativeDriver: true }),
-        Animated.spring(scaleAnim, { toValue: 1, damping: 22, stiffness: 120, useNativeDriver: true }),
+        Animated.spring(scaleAnim, { toValue: 1, damping: 24, stiffness: 88, useNativeDriver: true }),
       ]).start();
     } else {
       scaleAnim.setValue(0.9);
@@ -241,7 +241,7 @@ export default function ExportModal({ visible, input, onClose }: ExportModalProp
               </View>
               <Text style={styles.title}>Something interrupted</Text>
               <Text style={styles.body}>
-                Something interrupted the export. Please try again gently.
+                The export didn't complete. Please try again whenever you're ready.
               </Text>
               <TouchableOpacity
                 style={styles.primaryBtn}

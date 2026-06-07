@@ -160,7 +160,7 @@ function NameStep({ onNext }: { onNext: () => void }) {
 
   return (
     <View style={styles.dataContainer}>
-      <Text style={styles.dataEyebrow}>Let's start gently.</Text>
+      <Text style={styles.dataEyebrow}>Begin softly.</Text>
       <Text style={styles.dataTitle}>What shall we{'\n'}call you?</Text>
       <Text style={styles.dataBody}>
         This is your space. We just want to know how to greet you.
@@ -227,7 +227,7 @@ function LMPStep({ onNext }: { onNext: () => void }) {
         {user.name ? `${user.name}, when did your` : 'When did your'}{'\n'}last period begin?
       </Text>
       <Text style={styles.dataBody}>
-        This helps us understand where you are in your pregnancy and offer the right support each week.
+        This helps Bloom understand where you are in your journey, and offer the right support each week.
       </Text>
       <View style={styles.dateRow}>
         <View style={[styles.dateInputWrap, { flex: 0.8 }]}>

@@ -55,7 +55,7 @@ function StaggeredCard({
     const t = setTimeout(() => {
       Animated.parallel([
         Animated.timing(opacity, { toValue: 1, duration: 520, useNativeDriver: true }),
-        Animated.spring(translateY, { toValue: 0, damping: 22, stiffness: 110, useNativeDriver: true }),
+        Animated.spring(translateY, { toValue: 0, damping: 24, stiffness: 88, useNativeDriver: true }),
       ]).start();
     }, delay);
     return () => clearTimeout(t);
@@ -239,7 +239,7 @@ function ThisWeekWidget({
           <View style={styles.weekEmptyInner}>
             <View style={styles.weekEmptyOrb} />
             <Text style={styles.weekEmptyText}>
-              No moment captured yet this week.
+              A quiet week so far.
             </Text>
             <View style={styles.weekEmptyCTA}>
               <Text style={styles.weekEmptyCTAText}>Check in today</Text>
@@ -359,7 +359,7 @@ export default function HomeScreen() {
 
         {/* Today for you */}
         <StaggeredCard delay={500}>
-          <Text style={[styles.sectionTitle, { marginTop: 8 }]}>Today for you</Text>
+          <Text style={[styles.sectionTitle, { marginTop: 8 }]}>For you today</Text>
         </StaggeredCard>
 
         <StaggeredCard delay={560}>
@@ -392,7 +392,7 @@ export default function HomeScreen() {
 
         {/* Quick links */}
         <StaggeredCard delay={660}>
-          <Text style={[styles.sectionTitle, { marginTop: 8 }]}>Just for you</Text>
+          <Text style={[styles.sectionTitle, { marginTop: 8 }]}>Around Bloom</Text>
           <View style={styles.quickRow}>
             <TouchableOpacity
               style={styles.quickCard}

@@ -349,7 +349,7 @@ export function getTrimester(week: number): 1 | 2 | 3 {
 export const HOME_AFFIRMATIONS = [
   'Right now, your body is doing something it has never done before.',
   'You don\'t have to understand it all. You just have to live it.',
-  'You\'ve carried this this far. That already proves something.',
+  'You\'ve carried this far. That already proves something.',
   'Nobody is ever fully ready. And yet, here you are.',
   'Rest is not retreat. It\'s the work you can\'t see.',
   'The love you already feel — that\'s the real thing.',
@@ -374,11 +374,10 @@ export function getDailyAffirmation(week: number): string {
 
 export const GREETING_BY_TIME = (): string => {
   const hour = new Date().getHours();
-  if (hour >= 5 && hour < 8) return 'Good morning';
-  if (hour >= 8 && hour < 13) return 'Good morning';
+  if (hour >= 5 && hour < 13) return 'Good morning';
   if (hour < 17) return 'Good afternoon';
-  if (hour < 21) return 'Good evening';
-  return 'Evening';
+  if (hour < 23) return 'Good evening';
+  return 'Goodnight';
 };
 
 const MOOD_LABELS: Record<string, string> = {

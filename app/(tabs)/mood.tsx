@@ -100,7 +100,7 @@ function MoodSelectStep({
         <Animated.View style={{ opacity: headerFade }}>
           <View style={styles.memoryPill}>
             <View style={styles.memoryPillDot} />
-            <Text style={styles.memoryPillText}>{lastMoodMemory} How are you today?</Text>
+            <Text style={styles.memoryPillText}>{lastMoodMemory}</Text>
           </View>
         </Animated.View>
       ) : null}
