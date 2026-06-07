@@ -17,7 +17,9 @@ import { Colors } from '@/constants/colors';
 import { AmbientOrb } from '@/components/AmbientOrb';
 import { useBloom } from '@/context/BloomContext';
 import { getTrimester } from '@/constants/emotionalContent';
-import { getReflectionCount } from '@/stores/reflectionStore';
+import { getReflectionCount, exportSnapshot } from '@/stores/reflectionStore';
+import ExportModal from '@/components/ExportModal';
+import { MemoryBookInput } from '@/utils/memoryBookHtml';
 
 const TRIMESTER_NOTES: Record<1 | 2 | 3, string> = {
   1: 'First trimester — the quiet beginning.',
@@ -124,12 +126,65 @@ function ClearModal({
   );
 }
 
+// ─── Export CTA card ──────────────────────────────────────────────────────────
+
+function ExportCTACard({ onPress }: { onPress: () => void }) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  function handlePressIn() {
+    Animated.spring(scaleAnim, { toValue: 0.977, damping: 22, stiffness: 160, useNativeDriver: true }).start();
+  }
+  function handlePressOut() {
+    Animated.spring(scaleAnim, { toValue: 1, damping: 22, stiffness: 160, useNativeDriver: true }).start();
+  }
+
+  return (
+    <Animated.View style={[styles.exportCardWrap, { transform: [{ scale: scaleAnim }] }]}>
+      <TouchableOpacity
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={1}
+        accessibilityRole="button"
+        accessibilityLabel="Export your journey — create a memory book"
+      >
+        <LinearGradient
+          colors={['#FBF0EA', '#F5E4D6', '#F0D8C8']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.exportCard}
+        >
+          <View style={styles.exportCardDecor1} />
+          <View style={styles.exportCardDecor2} />
+
+          <View style={styles.exportCardLeft}>
+            <View style={styles.exportIconWrap}>
+              <LinearGradient colors={['#F5CBB4', '#EDBFA4']} style={styles.exportIconGradient}>
+                <Text style={styles.exportIconGlyph}>✦</Text>
+              </LinearGradient>
+            </View>
+            <View style={styles.exportTextWrap}>
+              <Text style={styles.exportCardTitle}>Export your journey</Text>
+              <Text style={styles.exportCardSub}>
+                A quiet keepsake of the moments you've carried.
+              </Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={Colors.textSoft} />
+        </LinearGradient>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { user, pregnancyWeek, clearJourney } = useBloom();
-  const [showModal, setShowModal] = useState(false);
+  const [showClearModal, setShowClearModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportInput, setExportInput] = useState<MemoryBookInput | null>(null);
   const [reflectionCount, setReflectionCount] = useState<number | null>(null);
 
   const headerFade = useRef(new Animated.Value(0)).current;
@@ -162,10 +217,23 @@ export default function SettingsScreen() {
   }, []);
 
   async function handleClear() {
-    setShowModal(false);
+    setShowClearModal(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await new Promise((r) => setTimeout(r, 300));
     await clearJourney();
+  }
+
+  async function handleExportPress() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const snapshot = await exportSnapshot();
+    const input: MemoryBookInput = {
+      userName: user.name ?? '',
+      pregnancyWeek: pregnancyWeek ?? 0,
+      entries: snapshot.entries,
+      generatedAt: new Date(),
+    };
+    setExportInput(input);
+    setShowExportModal(true);
   }
 
   const topPad = insets.top + (Platform.OS === 'web' ? 67 : 0);
@@ -270,6 +338,12 @@ export default function SettingsScreen() {
           </Animated.View>
         ) : null}
 
+        {/* ── Export your journey ── */}
+        <Animated.View style={{ opacity: card1Fade, transform: [{ translateY: card1Slide }] }}>
+          <Text style={styles.sectionLabel}>Memory</Text>
+          <ExportCTACard onPress={handleExportPress} />
+        </Animated.View>
+
         {/* Fresh start section */}
         <Animated.View
           style={[styles.freshSection, { opacity: card2Fade, transform: [{ translateY: card2Slide }] }]}
@@ -280,7 +354,7 @@ export default function SettingsScreen() {
             style={styles.clearButton}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setShowModal(true);
+              setShowClearModal(true);
             }}
             activeOpacity={0.8}
             accessibilityRole="button"
@@ -309,9 +383,15 @@ export default function SettingsScreen() {
       </ScrollView>
 
       <ClearModal
-        visible={showModal}
-        onKeep={() => setShowModal(false)}
+        visible={showClearModal}
+        onKeep={() => setShowClearModal(false)}
         onClear={handleClear}
+      />
+
+      <ExportModal
+        visible={showExportModal}
+        input={exportInput}
+        onClose={() => setShowExportModal(false)}
       />
     </LinearGradient>
   );
@@ -346,7 +426,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  // Offline indicator
   offlineIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -533,8 +612,98 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
 
+  // ── Export card ──
+  sectionLabel: {
+    fontSize: 11,
+    color: Colors.textSoft,
+    fontFamily: 'Inter_600SemiBold',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginBottom: 12,
+    marginTop: 4,
+    paddingHorizontal: 4,
+  },
+  exportCardWrap: {
+    borderRadius: Colors.radius.xl,
+    marginBottom: 28,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 5,
+    overflow: 'hidden',
+  },
+  exportCard: {
+    borderRadius: Colors.radius.xl,
+    paddingHorizontal: 20,
+    paddingVertical: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  exportCardDecor1: {
+    position: 'absolute',
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    top: -70,
+    right: -50,
+  },
+  exportCardDecor2: {
+    position: 'absolute',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    bottom: -30,
+    left: 30,
+  },
+  exportCardLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginRight: 8,
+  },
+  exportIconWrap: {
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.16,
+    shadowRadius: 7,
+    elevation: 3,
+    flexShrink: 0,
+  },
+  exportIconGradient: {
+    width: 48,
+    height: 48,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exportIconGlyph: {
+    fontSize: 18,
+    color: Colors.primary,
+  },
+  exportTextWrap: { flex: 1 },
+  exportCardTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: Colors.text,
+    fontFamily: 'CormorantGaramond_700Bold',
+    letterSpacing: -0.3,
+    marginBottom: 4,
+  },
+  exportCardSub: {
+    fontSize: 13,
+    color: Colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    lineHeight: 19,
+    fontStyle: 'italic',
+  },
+
   freshSection: {
-    marginTop: 16,
+    marginTop: 0,
     marginBottom: 8,
   },
   freshLabel: {

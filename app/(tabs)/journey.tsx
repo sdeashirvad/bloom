@@ -116,7 +116,7 @@ function CaptureCTA({ onPress }: { onPress: () => void }) {
     >
       <View style={styles.captureCTAInner}>
         <View style={styles.captureCTAIcon}>
-          <Ionicons name="add" size={18} color={Colors.primary} />
+          <Ionicons name="sunny" size={18} color={Colors.primary} />
         </View>
         <Text style={styles.captureCTAText}>Capture a moment</Text>
         <Ionicons name="chevron-forward" size={15} color={Colors.textLight} />

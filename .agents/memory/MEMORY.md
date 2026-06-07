@@ -1,3 +1,5 @@
 - [Expo Router splash + navigation gate pattern](expo-router-splash-nav-gate.md) — never return null from a component that siblings a Stack; use a SplashController inside the provider instead.
 - [Bloom motion system](bloom-motion-system.md) — standardized spring to damping:24, stiffness:88 (slightly overdamped, no bounce) across all slides/entrances.
 - [Bloom haptic design](bloom-haptic-design.md) — mood selection: Light impact; save reflection: NotificationFeedbackType.Success; skip/clear: Light impact.
+- [Bloom Colors token gaps](bloom-colors-tokens.md) — Colors object has no `primaryMuted`; use `Colors.textSoft` as the muted primary-adjacent tone. Always verify against constants/colors.ts before using a new token.
+- [Bloom PDF export architecture](bloom-pdf-export.md) — expo-print + expo-sharing for native PDF; web uses Blob + window.open for browser print. HTML template in utils/memoryBookHtml.ts; ExportModal in components/ExportModal.tsx.

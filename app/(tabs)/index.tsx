@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -34,6 +34,8 @@ import {
   TRIMESTER_HERO_GRADIENTS,
   TRIMESTER_HERO_SHADOW,
 } from '@/constants/timeOfDay';
+import { getReflectionsByWeek, ReflectionGroup } from '@/stores/reflectionStore';
+import { ReflectionEntry } from '@/types/reflection';
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -79,22 +81,12 @@ function MemoryLine({
 
   useEffect(() => {
     const t = setTimeout(() => {
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }).start();
+      Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }).start();
     }, 400);
     return () => clearTimeout(t);
   }, []);
 
-  const memory = getPersonalMemory(
-    user.name,
-    week,
-    totalDays,
-    user.lastMood,
-    user.lastMoodDate,
-  );
+  const memory = getPersonalMemory(user.name, week, totalDays, user.lastMood, user.lastMoodDate);
   if (!memory) return null;
 
   return (
@@ -130,22 +122,12 @@ function BreathingHeroCard({
     ).start();
   }, []);
 
-  const heroScale = breathAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.006],
-  });
-
+  const heroScale = breathAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.006] });
   const weeksLeft = Math.max(0, 40 - week);
 
   return (
     <Animated.View
-      style={[
-        styles.heroCardWrap,
-        {
-          shadowColor: heroShadow,
-          transform: [{ scale: heroScale }],
-        },
-      ]}
+      style={[styles.heroCardWrap, { shadowColor: heroShadow, transform: [{ scale: heroScale }] }]}
     >
       <LinearGradient
         colors={heroGradient}
@@ -155,7 +137,6 @@ function BreathingHeroCard({
       >
         <View style={styles.heroDecorRing1} />
         <View style={styles.heroDecorRing2} />
-
         <View style={styles.heroInner}>
           <View style={styles.heroLeft}>
             <Text style={styles.heroEyebrow}>You are in</Text>
@@ -172,13 +153,101 @@ function BreathingHeroCard({
             <BabyIllustration week={week} size={110} />
           </View>
         </View>
-
         <View style={styles.heroBottom}>
           <Text style={styles.heroBabyLabel}>About the size of</Text>
           <Text style={styles.heroBabySize}>{weekData.babySize}</Text>
           <Text style={styles.heroBabyDetail}>{weekData.babySizeDetail}</Text>
         </View>
       </LinearGradient>
+    </Animated.View>
+  );
+}
+
+// ─── "This week in your journey" widget ──────────────────────────────────────
+
+const MOOD_ICONS: Record<string, string> = {
+  calm: '🌿', tired: '🌙', emotional: '🌊', anxious: '🍃', happy: '☀️',
+};
+
+function ThisWeekWidget({
+  week,
+  onCapture,
+}: {
+  week: number;
+  onCapture: () => void;
+}) {
+  const [weekEntries, setWeekEntries] = useState<ReflectionEntry[] | null>(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    getReflectionsByWeek(week).then((entries) => {
+      setWeekEntries(entries);
+      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
+    });
+  }, [week]);
+
+  if (weekEntries === null) return null;
+
+  // Most recent reflection this week
+  const latest = weekEntries[0] ?? null;
+
+  return (
+    <Animated.View style={{ opacity: fadeAnim }}>
+      <Text style={styles.sectionTitle}>This week in your journey</Text>
+      {latest ? (
+        <View style={styles.weekCard}>
+          <View style={styles.weekCardDecor} />
+          <View style={styles.weekCardHeader}>
+            <View style={styles.weekMoodPill}>
+              <Text style={styles.weekMoodIcon}>{MOOD_ICONS[latest.mood] ?? '🌿'}</Text>
+              <Text style={styles.weekMoodLabel}>
+                {latest.mood.charAt(0).toUpperCase() + latest.mood.slice(1)}
+              </Text>
+            </View>
+            {latest.keptClose ? (
+              <Text style={styles.weekKeptClose}>❤ Kept close</Text>
+            ) : null}
+            {latest.milestoneTag ? (
+              <Text style={styles.weekMilestone}>✦ {latest.milestoneTag}</Text>
+            ) : null}
+          </View>
+          {latest.userReflection ? (
+            <Text style={styles.weekReflection} numberOfLines={3}>
+              "{latest.userReflection}"
+            </Text>
+          ) : (
+            <Text style={styles.weekBloomReply} numberOfLines={3}>
+              {latest.bloomReply}
+            </Text>
+          )}
+          <View style={styles.weekCardFooter}>
+            <Text style={styles.weekCardDate}>
+              {new Date(latest.createdAt).toLocaleDateString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+              })}
+            </Text>
+          </View>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={styles.weekEmptyCard}
+          onPress={onCapture}
+          activeOpacity={0.82}
+        >
+          <View style={styles.weekEmptyInner}>
+            <View style={styles.weekEmptyOrb} />
+            <Text style={styles.weekEmptyText}>
+              No moment captured yet this week.
+            </Text>
+            <View style={styles.weekEmptyCTA}>
+              <Text style={styles.weekEmptyCTAText}>Check in today</Text>
+              <Ionicons name="chevron-forward" size={13} color={Colors.primary} />
+            </View>
+          </View>
+        </TouchableOpacity>
+      )}
     </Animated.View>
   );
 }
@@ -204,29 +273,15 @@ export default function HomeScreen() {
   const topPad = insets.top + (Platform.OS === 'web' ? 67 : 0);
   const bottomPad = Platform.OS === 'web' ? 34 : 0;
 
+  function handleMoodCapture() {
+    router.push('/(tabs)/mood');
+  }
+
   return (
     <LinearGradient colors={bgGradient} style={styles.container}>
-      <AmbientOrb
-        size={260}
-        color={orbColors[0]}
-        opacity={0.18}
-        phaseSeed={0}
-        style={{ top: -100, right: -90 }}
-      />
-      <AmbientOrb
-        size={180}
-        color={orbColors[1]}
-        opacity={0.16}
-        phaseSeed={0.5}
-        style={{ bottom: 260, left: -70 }}
-      />
-      <AmbientOrb
-        size={120}
-        color={orbColors[2]}
-        opacity={0.13}
-        phaseSeed={0.75}
-        style={{ top: 340, right: -40 }}
-      />
+      <AmbientOrb size={260} color={orbColors[0]} opacity={0.18} phaseSeed={0} style={{ top: -100, right: -90 }} />
+      <AmbientOrb size={180} color={orbColors[1]} opacity={0.16} phaseSeed={0.5} style={{ bottom: 260, left: -70 }} />
+      <AmbientOrb size={120} color={orbColors[2]} opacity={0.13} phaseSeed={0.75} style={{ top: 340, right: -40 }} />
 
       <ScrollView
         contentContainerStyle={[
@@ -268,12 +323,7 @@ export default function HomeScreen() {
 
         {/* Breathing hero card */}
         <StaggeredCard delay={180}>
-          <BreathingHeroCard
-            week={week}
-            totalDays={totalDays}
-            daysAlong={daysAlong || 0}
-            trimester={trimester}
-          />
+          <BreathingHeroCard week={week} totalDays={totalDays} daysAlong={daysAlong || 0} trimester={trimester} />
         </StaggeredCard>
 
         {/* Affirmation */}
@@ -286,7 +336,7 @@ export default function HomeScreen() {
           </View>
         </StaggeredCard>
 
-        {/* Companion note — trimester-aware, rotating */}
+        {/* Companion note */}
         <StaggeredCard delay={330}>
           <LinearGradient colors={['#FDF5EE', '#F8EDE0']} style={styles.companionNote}>
             <Text style={styles.companionMark}>✦</Text>
@@ -302,12 +352,17 @@ export default function HomeScreen() {
           </LinearGradient>
         </StaggeredCard>
 
-        {/* Today for you */}
-        <StaggeredCard delay={440}>
-          <Text style={styles.sectionTitle}>Today for you</Text>
+        {/* This week in your journey */}
+        <StaggeredCard delay={430}>
+          <ThisWeekWidget week={week} onCapture={handleMoodCapture} />
         </StaggeredCard>
 
+        {/* Today for you */}
         <StaggeredCard delay={500}>
+          <Text style={[styles.sectionTitle, { marginTop: 8 }]}>Today for you</Text>
+        </StaggeredCard>
+
+        <StaggeredCard delay={560}>
           <BloomCard style={styles.insightCard} variant="white" padding={22}>
             <View style={styles.insightRow}>
               <View style={[styles.insightIcon, { backgroundColor: Colors.lavenderLight }]}>
@@ -321,7 +376,7 @@ export default function HomeScreen() {
           </BloomCard>
         </StaggeredCard>
 
-        <StaggeredCard delay={560}>
+        <StaggeredCard delay={610}>
           <BloomCard style={styles.insightCard} variant="white" padding={22}>
             <View style={styles.insightRow}>
               <View style={[styles.insightIcon, { backgroundColor: Colors.sageLight }]}>
@@ -335,8 +390,8 @@ export default function HomeScreen() {
           </BloomCard>
         </StaggeredCard>
 
-        {/* Explore */}
-        <StaggeredCard delay={640}>
+        {/* Quick links */}
+        <StaggeredCard delay={660}>
           <Text style={[styles.sectionTitle, { marginTop: 8 }]}>Just for you</Text>
           <View style={styles.quickRow}>
             <TouchableOpacity
@@ -351,12 +406,12 @@ export default function HomeScreen() {
                   <Ionicons name="leaf" size={18} color={Colors.lavender} />
                 </View>
                 <Text style={styles.quickLabel}>This week</Text>
-                <Text style={styles.quickSub}>Baby & your body</Text>
+                <Text style={styles.quickSub}>Baby &amp; your body</Text>
               </LinearGradient>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.quickCard}
-              onPress={() => router.push('/(tabs)/mood')}
+              onPress={handleMoodCapture}
               activeOpacity={0.82}
               accessibilityRole="button"
               accessibilityLabel="Mood check — how are you today?"
@@ -498,47 +553,18 @@ const styles = StyleSheet.create({
     lineHeight: 58,
     letterSpacing: -1.5,
   },
-  heroDayRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  heroDay: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.75)',
-    fontFamily: 'Inter_400Regular',
-  },
-  heroDayDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: 'rgba(255,255,255,0.4)',
-  },
+  heroDayRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  heroDay: { fontSize: 13, color: 'rgba(255,255,255,0.75)', fontFamily: 'Inter_400Regular' },
+  heroDayDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: 'rgba(255,255,255,0.4)' },
   heroBottom: {
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.16)',
     paddingTop: 18,
     gap: 4,
   },
-  heroBabyLabel: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.62)',
-    fontFamily: 'Inter_400Regular',
-    letterSpacing: 0.3,
-  },
-  heroBabySize: {
-    fontSize: 24,
-    color: '#FFF',
-    fontWeight: '600',
-    fontFamily: 'CormorantGaramond_600SemiBold',
-    letterSpacing: -0.3,
-  },
-  heroBabyDetail: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.58)',
-    fontFamily: 'Inter_400Regular',
-    lineHeight: 18,
-  },
+  heroBabyLabel: { fontSize: 12, color: 'rgba(255,255,255,0.62)', fontFamily: 'Inter_400Regular', letterSpacing: 0.3 },
+  heroBabySize: { fontSize: 24, color: '#FFF', fontWeight: '600', fontFamily: 'CormorantGaramond_600SemiBold', letterSpacing: -0.3 },
+  heroBabyDetail: { fontSize: 13, color: 'rgba(255,255,255,0.58)', fontFamily: 'Inter_400Regular', lineHeight: 18 },
 
   affirmationCard: {
     marginBottom: 12,
@@ -574,7 +600,7 @@ const styles = StyleSheet.create({
   emotionalNote: {
     borderRadius: Colors.radius.xl,
     padding: 24,
-    marginBottom: 32,
+    marginBottom: 28,
     overflow: 'hidden',
   },
   emotionalNoteDecor: {
@@ -592,6 +618,135 @@ const styles = StyleSheet.create({
     fontFamily: 'CormorantGaramond_600SemiBold',
     lineHeight: 30,
     letterSpacing: -0.2,
+  },
+
+  // ── This week widget ──
+  weekCard: {
+    backgroundColor: Colors.card,
+    borderRadius: Colors.radius.xl,
+    padding: 20,
+    marginBottom: 28,
+    overflow: 'hidden',
+    shadowColor: Colors.shadow.color,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.055,
+    shadowRadius: 14,
+    elevation: 3,
+  },
+  weekCardDecor: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(212,136,112,0.04)',
+    top: -30,
+    right: -25,
+  },
+  weekCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+    flexWrap: 'wrap',
+  },
+  weekMoodPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: Colors.primarySoft,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: Colors.radius.full,
+  },
+  weekMoodIcon: { fontSize: 12 },
+  weekMoodLabel: {
+    fontSize: 12,
+    color: Colors.primary,
+    fontFamily: 'Inter_500Medium',
+  },
+  weekKeptClose: {
+    fontSize: 11,
+    color: Colors.primary,
+    fontFamily: 'Inter_400Regular',
+    opacity: 0.75,
+  },
+  weekMilestone: {
+    fontSize: 11,
+    color: Colors.primary,
+    fontFamily: 'Inter_400Regular',
+    opacity: 0.75,
+  },
+  weekReflection: {
+    fontSize: 16,
+    color: Colors.textWarm,
+    fontFamily: 'CormorantGaramond_600SemiBold',
+    fontStyle: 'italic',
+    lineHeight: 24,
+    letterSpacing: -0.1,
+    marginBottom: 12,
+  },
+  weekBloomReply: {
+    fontSize: 14,
+    color: Colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    lineHeight: 22,
+    fontStyle: 'italic',
+    marginBottom: 12,
+  },
+  weekCardFooter: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
+    paddingTop: 10,
+    marginTop: 2,
+  },
+  weekCardDate: {
+    fontSize: 11,
+    color: Colors.textSoft,
+    fontFamily: 'Inter_400Regular',
+    letterSpacing: 0.2,
+  },
+
+  weekEmptyCard: {
+    backgroundColor: Colors.card,
+    borderRadius: Colors.radius.xl,
+    marginBottom: 28,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    borderStyle: 'dashed',
+    overflow: 'hidden',
+  },
+  weekEmptyInner: {
+    padding: 22,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  weekEmptyOrb: {
+    position: 'absolute',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.peachLight,
+    opacity: 0.3,
+    top: -20,
+    right: -10,
+  },
+  weekEmptyText: {
+    fontSize: 14,
+    color: Colors.textSoft,
+    fontFamily: 'Inter_400Regular',
+    fontStyle: 'italic',
+    marginBottom: 14,
+    textAlign: 'center',
+  },
+  weekEmptyCTA: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  weekEmptyCTAText: {
+    fontSize: 14,
+    color: Colors.primary,
+    fontFamily: 'Inter_500Medium',
   },
 
   sectionTitle: {
@@ -667,11 +822,7 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     elevation: 3,
   },
-  quickGradient: {
-    padding: 20,
-    gap: 10,
-    alignItems: 'flex-start',
-  },
+  quickGradient: { padding: 20, gap: 10, alignItems: 'flex-start' },
   quickIconWrap: {
     width: 38,
     height: 38,
