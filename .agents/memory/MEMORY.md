@@ -2,4 +2,5 @@
 - [Bloom motion system](bloom-motion-system.md) — standardized spring to damping:24, stiffness:88 (slightly overdamped, no bounce) across all slides/entrances.
 - [Bloom haptic design](bloom-haptic-design.md) — mood selection: Light impact; save reflection: NotificationFeedbackType.Success; skip/clear: Light impact.
 - [Bloom Colors token gaps](bloom-colors-tokens.md) — Colors object has no `primaryMuted`; use `Colors.textSoft` as the muted primary-adjacent tone. Always verify against constants/colors.ts before using a new token.
+- [Image gen: no hex codes in prompts](image-gen-hex-warning.md) — AI renders hex color codes (#RRGGBB) in prompts as literal text on the image. Describe colors by name only (e.g. "warm dusty rose, muted terracotta peach").
 - [Bloom PDF export architecture](bloom-pdf-export.md) — expo-print + expo-sharing for native PDF; web uses Blob + window.open for browser print. HTML template in utils/memoryBookHtml.ts; ExportModal in components/ExportModal.tsx.

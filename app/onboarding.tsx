@@ -36,10 +36,11 @@ function BloomDecor({
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.06, duration: 3800, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 3800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.06, duration: 4200, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 4200, useNativeDriver: true }),
       ])
     ).start();
+    return () => pulseAnim.stopAnimation();
   }, []);
 
   return (
@@ -154,8 +155,6 @@ function NameStep({ onNext }: { onNext: () => void }) {
     setIsSubmitting(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await updateUser({ name: name.trim() });
-    // onNext may advance the step and unmount this component —
-    // never call setState after this point.
     if (isMounted.current) onNext();
   }
 
@@ -202,13 +201,10 @@ function LMPStep({ onNext }: { onNext: () => void }) {
   const { user, updateUser } = useBloom();
 
   const fieldsComplete = day.length >= 1 && month.length >= 1 && year.length === 4;
-
   const parsedDate = fieldsComplete ? parseLMPFields(day, month, year) : null;
   const validation = parsedDate ? validateLMPDate(parsedDate) : null;
-
   const isBlocked = !fieldsComplete || !parsedDate || (validation?.blocking === true);
   const canContinue = !isBlocked && !isSubmitting;
-
   const helperText = validation?.warning ?? null;
   const helperIsWarning = validation?.blocking === true;
 
@@ -282,7 +278,6 @@ function LMPStep({ onNext }: { onNext: () => void }) {
         </View>
       </View>
 
-      {/* Soft helper text — warm, non-judgmental */}
       {helperText ? (
         <View style={[styles.helperRow, helperIsWarning && styles.helperRowBlocking]}>
           <View style={[styles.helperDot, helperIsWarning && styles.helperDotBlocking]} />
@@ -372,6 +367,7 @@ function BloomCompletionStep({
   firstPreg: boolean;
 }) {
   const { completeOnboarding } = useBloom();
+
   const ring1 = useRef(new Animated.Value(0)).current;
   const ring2 = useRef(new Animated.Value(0)).current;
   const ring3 = useRef(new Animated.Value(0)).current;
@@ -379,6 +375,12 @@ function BloomCompletionStep({
   const textFade = useRef(new Animated.Value(0)).current;
   const textSlide = useRef(new Animated.Value(24)).current;
   const btnFade = useRef(new Animated.Value(0)).current;
+
+  // Dedication overlay
+  const dedicationFade = useRef(new Animated.Value(0)).current;
+  const dedicationTextFade = useRef(new Animated.Value(0)).current;
+  const [dedicationVisible, setDedicationVisible] = useState(false);
+
   const hasCompleted = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -386,31 +388,27 @@ function BloomCompletionStep({
     Animated.sequence([
       Animated.spring(illustScale, {
         toValue: 1,
-        damping: 14,
-        stiffness: 70,
+        damping: 16,
+        stiffness: 72,
         useNativeDriver: true,
       }),
       Animated.stagger(140, [
-        Animated.spring(ring1, { toValue: 1, damping: 18, stiffness: 50, useNativeDriver: true }),
-        Animated.spring(ring2, { toValue: 1, damping: 18, stiffness: 40, useNativeDriver: true }),
-        Animated.spring(ring3, { toValue: 1, damping: 18, stiffness: 32, useNativeDriver: true }),
+        Animated.spring(ring1, { toValue: 1, damping: 22, stiffness: 50, useNativeDriver: true }),
+        Animated.spring(ring2, { toValue: 1, damping: 22, stiffness: 40, useNativeDriver: true }),
+        Animated.spring(ring3, { toValue: 1, damping: 22, stiffness: 32, useNativeDriver: true }),
       ]),
     ]).start();
 
     setTimeout(() => {
       Animated.parallel([
-        Animated.timing(textFade, { toValue: 1, duration: 700, useNativeDriver: true }),
-        Animated.spring(textSlide, { toValue: 0, damping: 22, stiffness: 90, useNativeDriver: true }),
+        Animated.timing(textFade, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.spring(textSlide, { toValue: 0, damping: 24, stiffness: 88, useNativeDriver: true }),
       ]).start();
     }, 500);
 
     setTimeout(() => {
-      Animated.timing(btnFade, { toValue: 1, duration: 500, useNativeDriver: true }).start();
-    }, 1300);
-
-    // Auto-complete after 3.5 seconds — longer than before to avoid race
-    const timer = setTimeout(() => handleComplete(), 3500);
-    return () => clearTimeout(timer);
+      Animated.timing(btnFade, { toValue: 1, duration: 600, useNativeDriver: true }).start();
+    }, 1400);
   }, []);
 
   async function handleComplete() {
@@ -418,10 +416,40 @@ function BloomCompletionStep({
     hasCompleted.current = true;
     setIsSubmitting(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // completeOnboarding now writes storage before updating state
+
+    // Show dedication overlay — soft atmospheric moment before entering
+    setDedicationVisible(true);
+
+    // 1. Fade the rest of the screen out softly
+    Animated.timing(dedicationFade, {
+      toValue: 1,
+      duration: 900,
+      useNativeDriver: true,
+    }).start();
+
+    // 2. After background settles, fade in the dedication text
+    await new Promise((r) => setTimeout(r, 500));
+    Animated.timing(dedicationTextFade, {
+      toValue: 1,
+      duration: 1100,
+      useNativeDriver: true,
+    }).start();
+
+    // 3. Hold quietly — let the words breathe
+    await new Promise((r) => setTimeout(r, 1800));
+
+    // 4. Fade the text out gently
+    await new Promise<void>((r) => {
+      Animated.timing(dedicationTextFade, {
+        toValue: 0,
+        duration: 700,
+        useNativeDriver: true,
+      }).start(() => r());
+    });
+
+    // 5. Navigate — the fade-out transition carries us forward
     await completeOnboarding({ isFirstPregnancy: firstPreg });
-    // Small settle delay so state propagation and navigation feel calm
-    await new Promise((r) => setTimeout(r, 150));
+    await new Promise((r) => setTimeout(r, 120));
   }
 
   return (
@@ -432,21 +460,21 @@ function BloomCompletionStep({
           style={[
             styles.ring,
             styles.ring3,
-            { transform: [{ scale: ring3 }], opacity: ring3.interpolate({ inputRange: [0, 1], outputRange: [0, 0.12] }) },
+            { transform: [{ scale: ring3 }], opacity: ring3.interpolate({ inputRange: [0, 1], outputRange: [0, 0.1] }) },
           ]}
         />
         <Animated.View
           style={[
             styles.ring,
             styles.ring2,
-            { transform: [{ scale: ring2 }], opacity: ring2.interpolate({ inputRange: [0, 1], outputRange: [0, 0.18] }) },
+            { transform: [{ scale: ring2 }], opacity: ring2.interpolate({ inputRange: [0, 1], outputRange: [0, 0.16] }) },
           ]}
         />
         <Animated.View
           style={[
             styles.ring,
             styles.ring1,
-            { transform: [{ scale: ring1 }], opacity: ring1.interpolate({ inputRange: [0, 1], outputRange: [0, 0.26] }) },
+            { transform: [{ scale: ring1 }], opacity: ring1.interpolate({ inputRange: [0, 1], outputRange: [0, 0.24] }) },
           ]}
         />
         <Animated.View style={{ transform: [{ scale: illustScale }] }}>
@@ -454,7 +482,7 @@ function BloomCompletionStep({
         </Animated.View>
       </View>
 
-      {/* Text */}
+      {/* Main text */}
       <Animated.View
         style={[
           styles.bloomTextWrap,
@@ -483,6 +511,18 @@ function BloomCompletionStep({
           <Text style={styles.primaryButtonText}>Enter Bloom</Text>
         </TouchableOpacity>
       </Animated.View>
+
+      {/* ── Dedication overlay ── */}
+      {dedicationVisible ? (
+        <Animated.View
+          style={[StyleSheet.absoluteFillObject, styles.dedicationOverlay, { opacity: dedicationFade }]}
+          pointerEvents="none"
+        >
+          <Animated.Text style={[styles.dedicationText, { opacity: dedicationTextFade }]}>
+            For mothers, everywhere.
+          </Animated.Text>
+        </Animated.View>
+      ) : null}
     </View>
   );
 }
@@ -499,21 +539,21 @@ export default function OnboardingScreen() {
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(contentOpacity, { toValue: 1, duration: 900, useNativeDriver: true }),
+      Animated.timing(contentOpacity, { toValue: 1, duration: 1000, useNativeDriver: true }),
       Animated.spring(contentSlide, { toValue: 0, damping: 24, stiffness: 70, useNativeDriver: true }),
     ]).start();
   }, []);
 
   function goToNext() {
     Animated.parallel([
-      Animated.timing(contentOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
-      Animated.timing(contentSlide, { toValue: -22, duration: 220, useNativeDriver: true }),
+      Animated.timing(contentOpacity, { toValue: 0, duration: 240, useNativeDriver: true }),
+      Animated.timing(contentSlide, { toValue: -20, duration: 240, useNativeDriver: true }),
     ]).start(() => {
       setStep((s) => s + 1);
       contentSlide.setValue(28);
       Animated.parallel([
-        Animated.timing(contentOpacity, { toValue: 1, duration: 380, useNativeDriver: true }),
-        Animated.spring(contentSlide, { toValue: 0, damping: 22, stiffness: 90, useNativeDriver: true }),
+        Animated.timing(contentOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.spring(contentSlide, { toValue: 0, damping: 24, stiffness: 88, useNativeDriver: true }),
       ]).start();
     });
   }
@@ -675,270 +715,278 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: {
     flexGrow: 1,
-    paddingHorizontal: 32,
+    paddingHorizontal: 28,
   },
-  dotsRow: { marginBottom: 44 },
+  dotsRow: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
 
-  // Story layout
+  // Story step
   storyContainer: {
     flex: 1,
-    minHeight: 480,
     justifyContent: 'space-between',
+    paddingBottom: 16,
   },
   decorRow: {
     alignItems: 'center',
-    paddingVertical: 28,
+    justifyContent: 'center',
+    paddingTop: 32,
+    paddingBottom: 24,
+    flex: 0,
   },
   storyContent: {
     flex: 1,
-    paddingBottom: 32,
+    paddingBottom: 24,
   },
   storyEyebrow: {
     fontSize: 13,
     color: Colors.primary,
-    fontFamily: 'Inter_500Medium',
-    letterSpacing: 0.8,
-    marginBottom: 14,
+    fontFamily: 'Inter_600SemiBold',
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
+    marginBottom: 14,
   },
   storyTitle: {
     fontSize: 38,
     fontWeight: '700',
     color: Colors.text,
-    lineHeight: 48,
-    letterSpacing: -0.8,
-    marginBottom: 20,
     fontFamily: 'CormorantGaramond_700Bold',
+    letterSpacing: -0.8,
+    lineHeight: 46,
+    marginBottom: 18,
   },
   storyBody: {
     fontSize: 17,
     color: Colors.textMuted,
-    lineHeight: 28,
     fontFamily: 'Inter_400Regular',
-    marginBottom: 8,
+    lineHeight: 28,
   },
-  privacyPoints: {
-    gap: 16,
-    marginTop: 8,
-  },
+  privacyPoints: { gap: 14, marginTop: 8 },
   privacyRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 14,
+    gap: 12,
   },
   privacyDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: Colors.sage,
+    backgroundColor: Colors.primarySoft,
     marginTop: 8,
     flexShrink: 0,
   },
   privacyText: {
     fontSize: 16,
     color: Colors.textWarm,
-    lineHeight: 26,
     fontFamily: 'Inter_400Regular',
+    lineHeight: 25,
     flex: 1,
   },
 
-  // Data layout
+  // Data steps
   dataContainer: {
     flex: 1,
+    justifyContent: 'flex-start',
+    paddingTop: 16,
+    paddingBottom: 24,
+    gap: 0,
   },
   dataEyebrow: {
     fontSize: 13,
     color: Colors.primary,
-    fontFamily: 'Inter_500Medium',
-    letterSpacing: 0.4,
+    fontFamily: 'Inter_600SemiBold',
+    letterSpacing: 1,
     marginBottom: 14,
   },
   dataTitle: {
-    fontSize: 38,
+    fontSize: 36,
     fontWeight: '700',
     color: Colors.text,
-    lineHeight: 46,
-    letterSpacing: -0.8,
-    marginBottom: 16,
     fontFamily: 'CormorantGaramond_700Bold',
+    letterSpacing: -0.6,
+    lineHeight: 44,
+    marginBottom: 14,
   },
   dataBody: {
     fontSize: 16,
     color: Colors.textMuted,
-    lineHeight: 26,
-    marginBottom: 36,
     fontFamily: 'Inter_400Regular',
+    lineHeight: 26,
+    marginBottom: 28,
   },
   textInput: {
     backgroundColor: Colors.card,
     borderRadius: Colors.radius.md,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
     paddingHorizontal: 20,
     paddingVertical: 18,
     fontSize: 18,
     color: Colors.text,
-    marginBottom: 22,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'CormorantGaramond_400Regular',
+    marginBottom: 24,
+    letterSpacing: -0.2,
   },
   dateRow: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 8,
+    marginBottom: 16,
   },
-  dateInputWrap: { gap: 6 },
+  dateInputWrap: { gap: 8 },
   dateLabel: {
-    fontSize: 11,
-    color: Colors.textMuted,
-    fontWeight: '500',
+    fontSize: 12,
+    color: Colors.textSoft,
+    fontFamily: 'Inter_600SemiBold',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
-    fontFamily: 'Inter_500Medium',
   },
   dateInput: {
     backgroundColor: Colors.card,
     borderRadius: Colors.radius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 18,
-    fontSize: 18,
-    color: Colors.text,
     borderWidth: 1.5,
     borderColor: Colors.border,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    fontSize: 20,
+    color: Colors.text,
+    fontFamily: 'CormorantGaramond_400Regular',
     textAlign: 'center',
-    fontFamily: 'Inter_400Regular',
+    letterSpacing: 1,
   },
-
-  // LMP helper / validation text
   helperRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
-    backgroundColor: Colors.peachLight,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: Colors.radius.md,
-    marginBottom: 20,
-    marginTop: 6,
+    gap: 8,
+    marginBottom: 16,
+    paddingHorizontal: 4,
   },
-  helperRowBlocking: {
-    backgroundColor: '#F5EDE5',
-  },
+  helperRowBlocking: {},
   helperDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.primary,
-    marginTop: 6,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: Colors.textSoft,
+    marginTop: 7,
     flexShrink: 0,
-    opacity: 0.6,
   },
-  helperDotBlocking: {
-    backgroundColor: '#C4876A',
-    opacity: 0.8,
-  },
+  helperDotBlocking: { backgroundColor: Colors.blush },
   helperText: {
-    fontSize: 14,
-    color: Colors.textWarm,
-    lineHeight: 22,
+    fontSize: 13,
+    color: Colors.textSoft,
     fontFamily: 'Inter_400Regular',
+    lineHeight: 20,
     flex: 1,
     fontStyle: 'italic',
   },
-  helperTextBlocking: {
-    color: '#7A4A32',
-  },
-
-  choiceRow: { gap: 14 },
+  helperTextBlocking: { color: Colors.blush },
+  choiceRow: { gap: 12, marginTop: 8 },
   choiceButton: {
     backgroundColor: Colors.card,
     borderRadius: Colors.radius.lg,
-    paddingVertical: 22,
-    paddingHorizontal: 24,
     borderWidth: 1.5,
     borderColor: Colors.border,
+    paddingVertical: 20,
+    paddingHorizontal: 24,
     alignItems: 'center',
   },
   choiceButtonSelected: {
     backgroundColor: Colors.primarySoft,
     borderColor: Colors.primary,
-    borderWidth: 2,
   },
   choiceText: {
     fontSize: 17,
     color: Colors.textWarm,
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'CormorantGaramond_600SemiBold',
+    letterSpacing: -0.2,
   },
-  choiceTextSelected: {
-    color: Colors.primary,
-    fontFamily: 'Inter_600SemiBold',
-  },
-
-  // Shared button
-  primaryButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: Colors.radius.full,
-    paddingVertical: 18,
-    alignItems: 'center',
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.28,
-    shadowRadius: 16,
-    elevation: 6,
-    marginTop: 8,
-  },
-  primaryButtonDisabled: {
-    backgroundColor: Colors.peach,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  primaryButtonText: {
-    color: Colors.white,
-    fontSize: 17,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-    fontFamily: 'Inter_600SemiBold',
-  },
+  choiceTextSelected: { color: Colors.primary },
 
   // Bloom completion
   bloomContainer: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 520,
-    gap: 32,
+    justifyContent: 'space-between',
+    paddingVertical: 32,
+    position: 'relative',
   },
   ringsWrap: {
-    width: 240,
-    height: 240,
+    width: 220,
+    height: 220,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 8,
   },
   ring: {
     position: 'absolute',
-    borderRadius: 999,
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primarySoft,
+    borderRadius: 9999,
   },
-  ring1: { width: 160, height: 160 },
-  ring2: { width: 200, height: 200 },
-  ring3: { width: 240, height: 240 },
+  ring1: { width: 180, height: 180 },
+  ring2: { width: 240, height: 240 },
+  ring3: { width: 300, height: 300 },
   bloomTextWrap: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
     gap: 12,
   },
   bloomTitle: {
-    fontSize: 36,
+    fontSize: 42,
     fontWeight: '700',
     color: Colors.text,
-    lineHeight: 44,
-    letterSpacing: -0.8,
-    textAlign: 'center',
     fontFamily: 'CormorantGaramond_700Bold',
+    letterSpacing: -1,
+    lineHeight: 50,
+    textAlign: 'center',
   },
   bloomSubtitle: {
     fontSize: 16,
     color: Colors.textMuted,
-    lineHeight: 26,
-    textAlign: 'center',
     fontFamily: 'Inter_400Regular',
+    textAlign: 'center',
+    lineHeight: 26,
+    fontStyle: 'italic',
+  },
+
+  // Dedication overlay
+  dedicationOverlay: {
+    backgroundColor: '#FBF7F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999,
+  },
+  dedicationText: {
+    fontSize: 22,
+    color: Colors.textWarm,
+    fontFamily: 'CormorantGaramond_400Regular',
+    fontStyle: 'italic',
+    letterSpacing: -0.3,
+    textAlign: 'center',
+    lineHeight: 34,
+  },
+
+  // Shared CTA button
+  primaryButton: {
+    backgroundColor: Colors.primary,
+    borderRadius: Colors.radius.full,
+    paddingVertical: 18,
+    alignItems: 'center',
+    width: '100%',
+    marginTop: 12,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.24,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+  primaryButtonDisabled: { opacity: 0.48 },
+  primaryButtonText: {
+    color: Colors.white,
+    fontSize: 17,
+    fontFamily: 'Inter_600SemiBold',
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
 });

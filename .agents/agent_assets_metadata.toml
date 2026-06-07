@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "dCHQ0h-RsP1bJG5RqcTst"
+uri = "file://assets/icon.png"
+type = "image"
+title = "bloom_watercolor_icon"
