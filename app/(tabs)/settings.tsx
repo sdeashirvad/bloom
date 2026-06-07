@@ -25,6 +25,8 @@ const TRIMESTER_NOTES: Record<1 | 2 | 3, string> = {
   3: 'Third trimester — almost there.',
 };
 
+// ─── Privacy points ───────────────────────────────────────────────────────────
+
 function PrivacyPoint({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: string }) {
   return (
     <View style={styles.privacyPoint}>
@@ -35,6 +37,30 @@ function PrivacyPoint({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; te
     </View>
   );
 }
+
+// ─── Offline indicator ────────────────────────────────────────────────────────
+
+function OfflineIndicator() {
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 0.5, duration: 2200, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 2200, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+
+  return (
+    <View style={styles.offlineIndicator}>
+      <Animated.View style={[styles.offlineDot, { opacity: pulseAnim }]} />
+      <Text style={styles.offlineText}>Offline · Local only</Text>
+    </View>
+  );
+}
+
+// ─── Clear modal ──────────────────────────────────────────────────────────────
 
 function ClearModal({
   visible,
@@ -74,7 +100,7 @@ function ClearModal({
 
           <Text style={styles.modalTitle}>Clear your journey?</Text>
           <Text style={styles.modalBody}>
-            This will remove all your data from this device. Nothing is sent anywhere. You can always begin again whenever you're ready.
+            This will remove all your data from this device. Nothing is sent anywhere — it was only ever yours. You can always begin again whenever you're ready.
           </Text>
 
           <TouchableOpacity
@@ -97,6 +123,8 @@ function ClearModal({
     </Modal>
   );
 }
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -169,27 +197,20 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
-        <Animated.View
-          style={{ opacity: headerFade, transform: [{ translateY: headerSlide }] }}
-        >
+        <Animated.View style={{ opacity: headerFade, transform: [{ translateY: headerSlide }] }}>
           <Text style={styles.eyebrow}>Your sanctuary</Text>
           <Text style={styles.pageTitle}>Sanctuary</Text>
           <Text style={styles.pageSubtitle}>
-            Bloom lives entirely on your device.{'\n'}Quiet, private, and always yours.
+            Your journey stays with you.{'\n'}Quiet, private, and always yours.
           </Text>
+          <OfflineIndicator />
         </Animated.View>
 
         {/* Privacy card */}
         <Animated.View
-          style={[
-            styles.privacyCard,
-            { opacity: card1Fade, transform: [{ translateY: card1Slide }] },
-          ]}
+          style={[styles.privacyCard, { opacity: card1Fade, transform: [{ translateY: card1Slide }] }]}
         >
-          <LinearGradient
-            colors={['#FFFFFF', '#FDF8F3']}
-            style={styles.privacyCardInner}
-          >
+          <LinearGradient colors={['#FFFFFF', '#FDF8F3']} style={styles.privacyCardInner}>
             <View style={styles.privacyCardDecor} />
 
             <View style={styles.privacyCardHeader}>
@@ -205,7 +226,7 @@ export default function SettingsScreen() {
             </View>
 
             <Text style={styles.privacyCardBody}>
-              Bloom stores your journey only on this device. Nothing is shared, uploaded, or sold — ever.
+              Bloom stores your journey only on this device. Nothing is shared, uploaded, or sold — ever. Not now, not later. Your words are yours alone.
             </Text>
 
             <View style={styles.divider} />
@@ -215,6 +236,7 @@ export default function SettingsScreen() {
               <PrivacyPoint icon="person-remove-outline" text="No account required" />
               <PrivacyPoint icon="wifi-outline" text="No internet needed — ever" />
               <PrivacyPoint icon="eye-off-outline" text="No tracking, no data collection" />
+              <PrivacyPoint icon="lock-closed-outline" text="Your words are yours alone" />
             </View>
           </LinearGradient>
         </Animated.View>
@@ -222,19 +244,11 @@ export default function SettingsScreen() {
         {/* Journey card */}
         {user.name ? (
           <Animated.View
-            style={[
-              styles.journeyCard,
-              { opacity: card1Fade, transform: [{ translateY: card1Slide }] },
-            ]}
+            style={[styles.journeyCard, { opacity: card1Fade, transform: [{ translateY: card1Slide }] }]}
           >
-            <LinearGradient
-              colors={['#FBF2EC', '#F7E8DE']}
-              style={styles.journeyCardInner}
-            >
+            <LinearGradient colors={['#FBF2EC', '#F7E8DE']} style={styles.journeyCardInner}>
               <View style={styles.journeyCardDecor} />
-              <Text style={styles.journeyGreeting}>
-                {user.name}'s journey
-              </Text>
+              <Text style={styles.journeyGreeting}>{user.name}'s journey</Text>
               <Text style={styles.journeyWeek}>Week {pregnancyWeek}</Text>
               <Text style={styles.journeyNote}>{TRIMESTER_NOTES[trimester]}</Text>
 
@@ -244,8 +258,11 @@ export default function SettingsScreen() {
                   <Text style={styles.journeySummaryLabel}>Your journey so far</Text>
                   <Text style={styles.journeySummaryValue}>
                     {reflectionCount === 1
-                      ? '1 reflection shared'
-                      : `${reflectionCount} reflections shared`}
+                      ? '1 moment shared'
+                      : `${reflectionCount} moments shared`}
+                  </Text>
+                  <Text style={styles.journeySummaryNote}>
+                    Each one held safely, only here.
                   </Text>
                 </View>
               ) : null}
@@ -255,10 +272,7 @@ export default function SettingsScreen() {
 
         {/* Fresh start section */}
         <Animated.View
-          style={[
-            styles.freshSection,
-            { opacity: card2Fade, transform: [{ translateY: card2Slide }] },
-          ]}
+          style={[styles.freshSection, { opacity: card2Fade, transform: [{ translateY: card2Slide }] }]}
         >
           <Text style={styles.freshLabel}>If you ever need to</Text>
 
@@ -282,12 +296,13 @@ export default function SettingsScreen() {
           </TouchableOpacity>
 
           <Text style={styles.clearHint}>
-            Removes all your data from this device.{'\n'}Nothing is sent anywhere.
+            Removes all your data from this device.{'\n'}Nothing is sent anywhere — it simply goes.
           </Text>
         </Animated.View>
 
         {/* Footer */}
         <Animated.View style={[styles.footer, { opacity: card2Fade }]}>
+          <Text style={styles.footerPrivacyLine}>Your journey stays with you.</Text>
           <Text style={styles.footerText}>Bloom · Version 1.0</Text>
           <Text style={styles.footerSub}>Made with care, for you.</Text>
         </Animated.View>
@@ -328,7 +343,27 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     fontFamily: 'Inter_400Regular',
     lineHeight: 24,
-    marginBottom: 36,
+    marginBottom: 12,
+  },
+
+  // Offline indicator
+  offlineIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginBottom: 32,
+  },
+  offlineDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.sage,
+  },
+  offlineText: {
+    fontSize: 12,
+    color: Colors.textSoft,
+    fontFamily: 'Inter_400Regular',
+    letterSpacing: 0.2,
   },
 
   privacyCard: {
@@ -470,9 +505,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontStyle: 'italic',
   },
-  journeySummary: {
-    marginTop: 18,
-  },
+  journeySummary: { marginTop: 18 },
   journeySummaryDivider: {
     height: 1,
     backgroundColor: 'rgba(212,136,112,0.15)',
@@ -489,6 +522,13 @@ const styles = StyleSheet.create({
   journeySummaryValue: {
     fontSize: 15,
     color: Colors.textWarm,
+    fontFamily: 'Inter_400Regular',
+    fontStyle: 'italic',
+    marginBottom: 4,
+  },
+  journeySummaryNote: {
+    fontSize: 12,
+    color: Colors.textSoft,
     fontFamily: 'Inter_400Regular',
     fontStyle: 'italic',
   },
@@ -552,6 +592,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 24,
     gap: 4,
+  },
+  footerPrivacyLine: {
+    fontSize: 14,
+    color: Colors.textSoft,
+    fontFamily: 'CormorantGaramond_400Regular',
+    fontStyle: 'italic',
+    letterSpacing: 0.1,
+    marginBottom: 6,
   },
   footerText: {
     fontSize: 13,

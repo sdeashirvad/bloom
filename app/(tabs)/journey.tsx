@@ -21,14 +21,16 @@ import {
   getAllReflections,
   groupReflectionsByMonth,
   ReflectionGroup,
+  toggleKeptClose,
+  setMilestoneTag,
 } from '@/stores/reflectionStore';
-import { ReflectionEntry } from '@/types/reflection';
+import { ReflectionEntry, MilestoneTag } from '@/types/reflection';
 
-// ─── Milestone detection ──────────────────────────────────────────────────────
+// ─── Milestone detection (system milestones) ──────────────────────────────────
 
-type Milestone = { week: number; label: string; note: string };
+type SystemMilestone = { week: number; label: string; note: string };
 
-const MILESTONES: Milestone[] = [
+const SYSTEM_MILESTONES: SystemMilestone[] = [
   { week: 13, label: 'First trimester complete', note: 'A quiet, tender beginning.' },
   { week: 20, label: 'Halfway there', note: 'The journey is unfolding.' },
   { week: 24, label: 'Viability week', note: 'Something profound this week.' },
@@ -36,9 +38,9 @@ const MILESTONES: Milestone[] = [
   { week: 36, label: 'Due month approaching', note: 'Almost time to meet each other.' },
 ];
 
-function getMilestoneForGroup(entries: ReflectionEntry[]): Milestone | null {
+function getMilestoneForGroup(entries: ReflectionEntry[]): SystemMilestone | null {
   const weeks = new Set(entries.map((e) => e.pregnancyWeek));
-  return MILESTONES.find((m) => weeks.has(m.week)) ?? null;
+  return SYSTEM_MILESTONES.find((m) => weeks.has(m.week)) ?? null;
 }
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
@@ -66,11 +68,7 @@ function EmptyState({ onCapture }: { onCapture: () => void }) {
       <Text style={styles.emptySubtitle}>
         Each moment you share becomes a quiet part{'\n'}of your story.
       </Text>
-      <TouchableOpacity
-        style={styles.emptyCTA}
-        onPress={onCapture}
-        activeOpacity={0.82}
-      >
+      <TouchableOpacity style={styles.emptyCTA} onPress={onCapture} activeOpacity={0.82}>
         <Text style={styles.emptyCTAText}>Check in today</Text>
       </TouchableOpacity>
     </Animated.View>
@@ -89,9 +87,9 @@ function GroupHeader({ label }: { label: string }) {
   );
 }
 
-// ─── Milestone marker ─────────────────────────────────────────────────────────
+// ─── System milestone marker ──────────────────────────────────────────────────
 
-function MilestoneMarker({ milestone }: { milestone: Milestone }) {
+function MilestoneMarker({ milestone }: { milestone: SystemMilestone }) {
   return (
     <View style={styles.milestone}>
       <LinearGradient colors={['#FDF0EA', '#F7E4D6']} style={styles.milestoneInner}>
@@ -127,11 +125,71 @@ function CaptureCTA({ onPress }: { onPress: () => void }) {
   );
 }
 
+// ─── "Moments kept close" section ────────────────────────────────────────────
+
+function KeptCloseSection({
+  entries,
+  onToggleKeptClose,
+  onSetMilestone,
+}: {
+  entries: ReflectionEntry[];
+  onToggleKeptClose: (id: string) => void;
+  onSetMilestone: (id: string, tag: MilestoneTag | null) => void;
+}) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(14)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.spring(slideAnim, { toValue: 0, damping: 24, stiffness: 88, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  if (entries.length === 0) return null;
+
+  return (
+    <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+      <View style={styles.keptCloseHeader}>
+        <Text style={styles.keptCloseMark}>❤</Text>
+        <Text style={styles.keptCloseTitle}>Moments kept close</Text>
+      </View>
+      <Text style={styles.keptCloseSubtitle}>
+        These reflections meant something more.
+      </Text>
+      {entries.map((entry, i) => (
+        <JourneyCard
+          key={`kc-${entry.id}`}
+          entry={entry}
+          delay={i * 60}
+          variant="keptClose"
+          onToggleKeptClose={() => onToggleKeptClose(entry.id)}
+          onSetMilestone={(tag) => onSetMilestone(entry.id, tag)}
+        />
+      ))}
+      <View style={styles.keptCloseDivider} />
+    </Animated.View>
+  );
+}
+
+// ─── Privacy badge ────────────────────────────────────────────────────────────
+
+function PrivacyNudge() {
+  return (
+    <View style={styles.privacyNudge}>
+      <View style={styles.privacyNudgeDot} />
+      <Text style={styles.privacyNudgeText}>Your journey stays with you</Text>
+    </View>
+  );
+}
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function JourneyScreen() {
   const insets = useSafeAreaInsets();
+  const [allEntries, setAllEntries] = useState<ReflectionEntry[]>([]);
   const [groups, setGroups] = useState<ReflectionGroup[]>([]);
+  const [keptCloseEntries, setKeptCloseEntries] = useState<ReflectionEntry[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -143,7 +201,9 @@ export default function JourneyScreen() {
 
   async function loadReflections() {
     const all = await getAllReflections();
+    setAllEntries(all);
     setGroups(groupReflectionsByMonth(all));
+    setKeptCloseEntries(all.filter((e) => e.keptClose === true));
     setLoaded(true);
   }
 
@@ -166,7 +226,20 @@ export default function JourneyScreen() {
     router.push('/(tabs)/mood');
   }
 
-  const isEmpty = loaded && groups.length === 0;
+  async function handleToggleKeptClose(id: string) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await toggleKeptClose(id);
+    await loadReflections();
+  }
+
+  async function handleSetMilestone(id: string, tag: MilestoneTag | null) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await setMilestoneTag(id, tag);
+    await loadReflections();
+  }
+
+  const isEmpty = loaded && allEntries.length === 0;
+  const hasKeptClose = keptCloseEntries.length > 0;
 
   return (
     <LinearGradient colors={['#FBF7F0', '#F5EDE0', '#F0E5D5']} style={styles.container}>
@@ -200,14 +273,13 @@ export default function JourneyScreen() {
         }
       >
         {/* Header */}
-        <Animated.View
-          style={{ opacity: headerFade, transform: [{ translateY: headerSlide }] }}
-        >
+        <Animated.View style={{ opacity: headerFade, transform: [{ translateY: headerSlide }] }}>
           <Text style={styles.eyebrow}>Your journey</Text>
           <Text style={styles.pageTitle}>Memories</Text>
           <Text style={styles.pageSubtitle}>
             A gentle keepsake of your{'\n'}pregnancy journey.
           </Text>
+          <PrivacyNudge />
         </Animated.View>
 
         {/* Capture CTA */}
@@ -221,24 +293,38 @@ export default function JourneyScreen() {
         {!loaded ? null : isEmpty ? (
           <EmptyState onCapture={handleCapture} />
         ) : (
-          <View style={styles.timeline}>
-            {groups.map((group, groupIndex) => {
-              const milestone = getMilestoneForGroup(group.entries);
-              return (
-                <View key={group.key}>
-                  <GroupHeader label={group.label} />
-                  {milestone && <MilestoneMarker milestone={milestone} />}
-                  {group.entries.map((entry, entryIndex) => (
-                    <JourneyCard
-                      key={entry.id}
-                      entry={entry}
-                      delay={groupIndex * 60 + entryIndex * 80}
-                    />
-                  ))}
-                </View>
-              );
-            })}
-          </View>
+          <>
+            {/* "Moments kept close" — only when at least one entry is kept */}
+            {hasKeptClose && (
+              <KeptCloseSection
+                entries={keptCloseEntries}
+                onToggleKeptClose={handleToggleKeptClose}
+                onSetMilestone={handleSetMilestone}
+              />
+            )}
+
+            {/* Main timeline */}
+            <View style={styles.timeline}>
+              {groups.map((group, groupIndex) => {
+                const systemMilestone = getMilestoneForGroup(group.entries);
+                return (
+                  <View key={group.key}>
+                    <GroupHeader label={group.label} />
+                    {systemMilestone && <MilestoneMarker milestone={systemMilestone} />}
+                    {group.entries.map((entry, entryIndex) => (
+                      <JourneyCard
+                        key={entry.id}
+                        entry={entry}
+                        delay={groupIndex * 60 + entryIndex * 80}
+                        onToggleKeptClose={() => handleToggleKeptClose(entry.id)}
+                        onSetMilestone={(tag) => handleSetMilestone(entry.id, tag)}
+                      />
+                    ))}
+                  </View>
+                );
+              })}
+            </View>
+          </>
         )}
       </ScrollView>
     </LinearGradient>
@@ -271,7 +357,29 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     fontFamily: 'Inter_400Regular',
     lineHeight: 24,
-    marginBottom: 30,
+    marginBottom: 12,
+  },
+
+  // Privacy nudge
+  privacyNudge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginBottom: 28,
+  },
+  privacyNudgeDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: Colors.sage,
+    opacity: 0.6,
+  },
+  privacyNudgeText: {
+    fontSize: 12,
+    color: Colors.textSoft,
+    fontFamily: 'Inter_400Regular',
+    fontStyle: 'italic',
+    letterSpacing: 0.1,
   },
 
   captureCTA: {
@@ -308,9 +416,39 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_500Medium',
   },
 
-  timeline: {
-    gap: 0,
+  // "Moments kept close" section
+  keptCloseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
   },
+  keptCloseMark: {
+    fontSize: 13,
+    color: Colors.primary,
+    opacity: 0.7,
+  },
+  keptCloseTitle: {
+    fontSize: 13,
+    color: Colors.textWarm,
+    fontFamily: 'Inter_600SemiBold',
+    letterSpacing: 0.2,
+  },
+  keptCloseSubtitle: {
+    fontSize: 13,
+    color: Colors.textSoft,
+    fontFamily: 'Inter_400Regular',
+    fontStyle: 'italic',
+    marginBottom: 16,
+  },
+  keptCloseDivider: {
+    height: 1,
+    backgroundColor: Colors.borderLight,
+    marginBottom: 28,
+    marginTop: 4,
+  },
+
+  timeline: { gap: 0 },
 
   groupHeader: {
     flexDirection: 'row',
@@ -388,10 +526,7 @@ const styles = StyleSheet.create({
     opacity: 0.18,
     top: 20,
   },
-  emptyIcon: {
-    fontSize: 36,
-    marginBottom: 24,
-  },
+  emptyIcon: { fontSize: 36, marginBottom: 24 },
   emptyTitle: {
     fontSize: 24,
     fontWeight: '700',
