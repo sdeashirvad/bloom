@@ -236,6 +236,19 @@ export function getWeekData(week: number): WeekData {
   return data;
 }
 
+/**
+ * Rotate among insight, emotional note, and self-care tip so "For you today"
+ * stays fresh across the week without needing 280 unique strings.
+ */
+export function getRotatingDailyInsight(week: number): string {
+  const data = getWeekData(week);
+  const pool = [data.dailyInsight, data.emotionalNote, data.selfCareTip];
+  const now = new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 0);
+  const dayOfYear = Math.floor((now.getTime() - startOfYear.getTime()) / 86_400_000);
+  return pool[(dayOfYear + week) % pool.length];
+}
+
 export const MOOD_RESPONSES: Record<string, { title: string; message: string; color: string }> = {
   calm: {
     title: 'What a beautiful feeling.',

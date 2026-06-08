@@ -449,7 +449,7 @@ function buildCoverPage(input: MemoryBookInput): string {
   const generatedMonth = input.generatedAt.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   const forLine = name
-    ? `For ${name}`
+    ? `For ${name} and little one`
     : 'A quiet collection of moments from this pregnancy journey.';
 
   const dateLine = input.dueDate

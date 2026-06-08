@@ -26,43 +26,28 @@ const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="10
   <!-- Warm cream background -->
   <rect width="1024" height="1024" fill="url(#bg)"/>
 
-  <!-- Ambient center warmth -->
-  <circle cx="512" cy="512" r="300" fill="url(#center-glow)" filter="url(#center-blur)"/>
+  <!-- Bloom mark scaled up to fill the canvas (less dead whitespace on home screen) -->
+  <g transform="translate(512,512) scale(1.38) translate(-512,-512)">
+    <circle cx="512" cy="512" r="300" fill="url(#center-glow)" filter="url(#center-blur)"/>
 
-  <!-- 4 petals: diagonal arrangement for organic, blooming feel -->
-  <!-- Each petal is an ellipse centered 130px above canvas center, rotated around center -->
+    <ellipse cx="512" cy="382" rx="88" ry="130"
+      fill="#D4A49A" opacity="0.74"
+      transform="rotate(45, 512, 512)"/>
+    <ellipse cx="512" cy="382" rx="88" ry="130"
+      fill="#C89890" opacity="0.68"
+      transform="rotate(135, 512, 512)"/>
+    <ellipse cx="512" cy="382" rx="88" ry="130"
+      fill="#D6ACA0" opacity="0.64"
+      transform="rotate(225, 512, 512)"/>
+    <ellipse cx="512" cy="382" rx="88" ry="130"
+      fill="#C8948C" opacity="0.70"
+      transform="rotate(315, 512, 512)"/>
 
-  <!-- Petal 1: upper-right (45°) — slightly lighter -->
-  <ellipse cx="512" cy="382" rx="82" ry="122"
-    fill="#D4A49A"
-    opacity="0.72"
-    transform="rotate(45, 512, 512)"/>
-
-  <!-- Petal 2: lower-right (135°) -->
-  <ellipse cx="512" cy="382" rx="82" ry="122"
-    fill="#C89890"
-    opacity="0.66"
-    transform="rotate(135, 512, 512)"/>
-
-  <!-- Petal 3: lower-left (225°) — slightly muted -->
-  <ellipse cx="512" cy="382" rx="82" ry="122"
-    fill="#D6ACA0"
-    opacity="0.62"
-    transform="rotate(225, 512, 512)"/>
-
-  <!-- Petal 4: upper-left (315°) -->
-  <ellipse cx="512" cy="382" rx="82" ry="122"
-    fill="#C8948C"
-    opacity="0.68"
-    transform="rotate(315, 512, 512)"/>
-
-  <!-- Soft center bloom — the heart of the mark -->
-  <circle cx="512" cy="512" r="78" fill="#E8C4B0" opacity="0.48"/>
-  <circle cx="512" cy="512" r="46" fill="#D4A090" opacity="0.72"/>
-  <circle cx="512" cy="512" r="22" fill="#C89080" opacity="0.88"/>
-
-  <!-- Subtle warm highlight on center -->
-  <circle cx="504" cy="500" r="9" fill="#F2D8C8" opacity="0.60"/>
+    <circle cx="512" cy="512" r="82" fill="#E8C4B0" opacity="0.50"/>
+    <circle cx="512" cy="512" r="50" fill="#D4A090" opacity="0.74"/>
+    <circle cx="512" cy="512" r="24" fill="#C89080" opacity="0.90"/>
+    <circle cx="504" cy="500" r="10" fill="#F2D8C8" opacity="0.62"/>
+  </g>
 </svg>`;
 
 // ─── Foreground icon for Android adaptive icon ────────────────────────────────
@@ -82,8 +67,8 @@ const foregroundSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" heig
 
   <!-- Transparent background for adaptive icon -->
 
-  <!-- Bloom mark scaled to 60% and centered (safe zone) -->
-  <g transform="translate(512,512) scale(0.62) translate(-512,-512)">
+  <!-- Bloom mark scaled to ~84% — fills adaptive icon safe zone without clipping -->
+  <g transform="translate(512,512) scale(0.84) translate(-512,-512)">
     <!-- Ambient glow -->
     <circle cx="512" cy="512" r="280" fill="url(#center-glow)" filter="url(#center-blur)"/>
 

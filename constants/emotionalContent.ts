@@ -365,18 +365,65 @@ export const HOME_AFFIRMATIONS = [
   'Not every feeling needs to be managed. Some just need to move through.',
   'The gentlest journeys often carry the most weight.',
   'Whatever you\'re feeling right now is allowed to be here.',
+  'Your body is not behind. It is on its own wise timeline.',
+  'Small moments of care add up to something enormous.',
+  'You are allowed to take up space — physically, emotionally, all of it.',
+  'This season asks a lot. So does asking for help.',
+  'Your baby does not need a perfect mother. They need you.',
+  'Some weeks feel invisible. They still count.',
+  'Trust the quiet work happening beneath the surface.',
+  'You can love this journey and find it hard at the same time.',
+  'What feels ordinary to the world may be extraordinary to you.',
+  'Your tenderness right now is not fragility — it is depth.',
+  'There is no rush. Your story unfolds at its own pace.',
+  'You have already given more than you realize.',
+  'Let today be enough, even if it was not remarkable.',
+  'Your presence is the first gift your baby receives.',
+  'Healing, growing, and resting can all happen in the same day.',
+  'You do not have to earn your right to be cared for.',
+  'The bond you are building began long before you could feel it.',
+  'Uncertainty is not a sign you are failing — it is part of the path.',
+  'Your instincts are worth listening to, even when they whisper.',
+  'This body of yours is doing something ancient and remarkable.',
+  'You are not alone in the middle-of-the-night worries.',
+  'Gentleness toward yourself is never wasted.',
+  'Every week you carry them is a quiet act of devotion.',
+  'You are becoming someone new — and that takes courage.',
+  'What you need today is allowed to be different from yesterday.',
+  'Your story does not have to look like anyone else\'s.',
+  'There is room here for all of your feelings.',
 ];
 
-export function getDailyAffirmation(week: number): string {
-  const seed = week + new Date().getDate() + new Date().getMonth();
+const LATE_NIGHT_GREETINGS = [
+  'In the quiet hours',
+  'Awake in the stillness',
+  'The night holds you gently',
+  'Still here with you',
+  'You\'re not alone tonight',
+];
+
+export function getDailyAffirmation(week: number, daysAlong: number = 0): string {
+  const now = new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 0);
+  const dayOfYear = Math.floor((now.getTime() - startOfYear.getTime()) / 86_400_000);
+  const seed = week * 7 + daysAlong + dayOfYear;
   return HOME_AFFIRMATIONS[seed % HOME_AFFIRMATIONS.length];
 }
 
 export const GREETING_BY_TIME = (): string => {
   const hour = new Date().getHours();
-  if (hour >= 5 && hour < 13) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  if (hour < 23) return 'Good evening';
+
+  // Midnight through 4am — warm, emotionally consistent (not "Good afternoon")
+  if (hour >= 0 && hour < 5) {
+    const startOfYear = new Date(new Date().getFullYear(), 0, 0);
+    const dayOfYear = Math.floor((Date.now() - startOfYear.getTime()) / 86_400_000);
+    return LATE_NIGHT_GREETINGS[dayOfYear % LATE_NIGHT_GREETINGS.length];
+  }
+
+  if (hour >= 5 && hour < 12) return 'Good morning';
+  if (hour >= 12 && hour < 17) return 'Good afternoon';
+  if (hour >= 17 && hour < 21) return 'Good evening';
+  if (hour >= 21 && hour < 23) return 'Good evening';
   return 'Goodnight';
 };
 

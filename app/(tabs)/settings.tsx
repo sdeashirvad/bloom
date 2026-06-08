@@ -379,6 +379,7 @@ export default function SettingsScreen() {
           <Text style={styles.footerPrivacyLine}>Your journey stays with you.</Text>
           <Text style={styles.footerText}>Bloom · Version 1.0</Text>
           <Text style={styles.footerSub}>Made with care.</Text>
+          <Text style={styles.footerLab}>SDEAshirvadLabs</Text>
         </Animated.View>
       </ScrollView>
 
@@ -780,6 +781,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textLight,
     fontFamily: 'Inter_400Regular',
+  },
+  footerLab: {
+    fontSize: 11,
+    color: Colors.textLight,
+    fontFamily: 'Inter_400Regular',
+    opacity: 0.55,
+    letterSpacing: 0.4,
+    marginTop: 2,
   },
 
   modalOverlay: {

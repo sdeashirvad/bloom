@@ -21,7 +21,7 @@ import { TrimesterBadge } from '@/components/TrimesterBadge';
 import { AmbientOrb } from '@/components/AmbientOrb';
 import { useBloom } from '@/context/BloomContext';
 import { BloomUser } from '@/context/BloomContext';
-import { getWeekData } from '@/constants/weekData';
+import { getWeekData, getRotatingDailyInsight } from '@/constants/weekData';
 import {
   getDailyAffirmation,
   GREETING_BY_TIME,
@@ -357,7 +357,7 @@ export default function HomeScreen() {
 
   const week = pregnancyWeek || 18;
   const weekData = getWeekData(week);
-  const affirmation = getDailyAffirmation(week);
+  const affirmation = getDailyAffirmation(week, daysAlong || 0);
   const greeting = GREETING_BY_TIME();
   const trimester = getTrimester(week);
   const timeOfDay = getTimeOfDay();
@@ -479,7 +479,7 @@ export default function HomeScreen() {
               </View>
               <View style={styles.insightContent}>
                 <Text style={styles.insightLabel}>Daily insight</Text>
-                <Text style={styles.insightText}>{weekData.dailyInsight}</Text>
+                <Text style={styles.insightText}>{getRotatingDailyInsight(week)}</Text>
               </View>
             </View>
           </BloomCard>
