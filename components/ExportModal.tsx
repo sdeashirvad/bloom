@@ -1,9 +1,9 @@
 /**
  * ExportModal — Memory Book PDF generation and share flow.
  *
- * States: idle → generating → sharing → done | error
- * Keeps the experience calm and emotionally clean.
- * Everything runs locally — no uploads, no cloud.
+ * States: idle → generating → done | error
+ * PDF generation and share are split so the WebView can finish before
+ * the system share sheet opens (reduces Android first-run failures).
  */
 
 import React, { useRef, useEffect, useState } from 'react';
@@ -15,47 +15,97 @@ import {
   TouchableOpacity,
   Animated,
   Platform,
+  InteractionManager,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/colors';
 import { buildMemoryBookHtml, MemoryBookInput } from '@/utils/memoryBookHtml';
 
-// Lazy-import platform modules to avoid crashing on web
-async function generateAndShare(html: string): Promise<void> {
+// ─── Native module warmup (avoids cold-start delay on first export) ───────────
+
+let nativeModulesWarmup: Promise<void> | null = null;
+
+/** Call when the user shows interest in export — warms native modules early. */
+export function warmupExportModules(): void {
+  if (Platform.OS === 'web') return;
+  if (!nativeModulesWarmup) {
+    nativeModulesWarmup = Promise.all([
+      import('expo-print'),
+      import('expo-sharing'),
+    ]).then(() => undefined);
+  }
+}
+
+function warmupNativeModules(): void {
+  warmupExportModules();
+}
+
+async function ensureNativeModulesReady(): Promise<void> {
+  warmupNativeModules();
+  await nativeModulesWarmup;
+}
+
+// ─── PDF + share helpers ──────────────────────────────────────────────────────
+
+async function generatePdf(html: string): Promise<string> {
   if (Platform.OS === 'web') {
-    // On web: open a new window with the HTML (printable via browser)
     const blob = new Blob([html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const win = window.open(url, '_blank');
     if (win) {
       win.addEventListener('load', () => {
-        setTimeout(() => {
-          URL.revokeObjectURL(url);
-        }, 1000);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
       });
     }
-    return;
+    return url;
   }
 
-  // Native: expo-print → PDF file → expo-sharing
+  await ensureNativeModulesReady();
   const Print = await import('expo-print');
+  const { uri } = await Print.printToFileAsync({ html, base64: false });
+  return uri;
+}
+
+function isShareCancellation(err: unknown): boolean {
+  const message = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return (
+    message.includes('cancel') ||
+    message.includes('dismiss') ||
+    message.includes('did not share') ||
+    message.includes('user denied') ||
+    message.includes('abort')
+  );
+}
+
+async function sharePdf(uri: string): Promise<'shared' | 'cancelled'> {
+  if (Platform.OS === 'web') return 'shared';
+
   const Sharing = await import('expo-sharing');
-
-  const { uri } = await Print.printToFileAsync({
-    html,
-    base64: false,
-  });
-
   const canShare = await Sharing.isAvailableAsync();
   if (!canShare) {
     throw new Error('Sharing is not available on this device.');
   }
 
-  await Sharing.shareAsync(uri, {
-    UTI: 'com.adobe.pdf',
-    mimeType: 'application/pdf',
-    dialogTitle: 'Your Bloom Memory Book',
+  try {
+    await Sharing.shareAsync(uri, {
+      UTI: 'com.adobe.pdf',
+      mimeType: 'application/pdf',
+      dialogTitle: 'Your Bloom Memory Book',
+    });
+    return 'shared';
+  } catch (err) {
+    if (isShareCancellation(err)) return 'cancelled';
+    throw err;
+  }
+}
+
+/** Brief pause so the UI can paint "done" before the share sheet steals focus. */
+function waitForUiSettle(): Promise<void> {
+  return new Promise((resolve) => {
+    InteractionManager.runAfterInteractions(() => {
+      requestAnimationFrame(() => setTimeout(resolve, 150));
+    });
   });
 }
 
@@ -96,6 +146,7 @@ function BloomLoader() {
 export default function ExportModal({ visible, input, onClose }: ExportModalProps) {
   const [step, setStep] = useState<ExportStep>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const pdfUriRef = useRef<string | null>(null);
 
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
@@ -104,6 +155,8 @@ export default function ExportModal({ visible, input, onClose }: ExportModalProp
     if (visible) {
       setStep('idle');
       setErrorMsg('');
+      pdfUriRef.current = null;
+      warmupNativeModules();
       Animated.parallel([
         Animated.timing(opacityAnim, { toValue: 1, duration: 280, useNativeDriver: true }),
         Animated.spring(scaleAnim, { toValue: 1, damping: 24, stiffness: 88, useNativeDriver: true }),
@@ -117,21 +170,50 @@ export default function ExportModal({ visible, input, onClose }: ExportModalProp
   async function handleGenerate() {
     if (!input) return;
     setStep('generating');
+    setErrorMsg('');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     try {
-      // Build HTML on the JS thread — typically <200ms
+      await ensureNativeModulesReady();
       const html = buildMemoryBookHtml(input);
+      const uri = await generatePdf(html);
+      pdfUriRef.current = uri;
 
-      // Generate PDF + share
-      await generateAndShare(html);
-
+      // PDF is ready — update UI before opening the share sheet
       setStep('done');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      if (Platform.OS !== 'web') {
+        await waitForUiSettle();
+        const shareResult = await sharePdf(uri);
+        if (__DEV__ && shareResult === 'cancelled') {
+          console.log('[Bloom Export] Share sheet dismissed — PDF was still created.');
+        }
+      }
     } catch (err) {
+      if (__DEV__) {
+        console.error('[Bloom Export] Export failed:', err);
+      }
       const message = err instanceof Error ? err.message : 'Unknown error';
       setErrorMsg(message);
       setStep('error');
+    }
+  }
+
+  async function handleShareAgain() {
+    const uri = pdfUriRef.current;
+    if (!uri || Platform.OS === 'web') return;
+    try {
+      await sharePdf(uri);
+    } catch (err) {
+      if (__DEV__) {
+        console.error('[Bloom Export] Re-share failed:', err);
+      }
+      if (!isShareCancellation(err)) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        setErrorMsg(message);
+        setStep('error');
+      }
     }
   }
 
@@ -142,129 +224,151 @@ export default function ExportModal({ visible, input, onClose }: ExportModalProp
 
   const entryCount = input?.entries.length ?? 0;
   const hasEntries = entryCount > 0;
+  const isBusy = step === 'generating';
 
   return (
     <Modal
       transparent
       visible={visible}
       animationType="none"
-      onRequestClose={step === 'generating' ? undefined : handleClose}
+      statusBarTranslucent
+      onRequestClose={isBusy ? undefined : handleClose}
     >
-      <Animated.View style={[styles.overlay, { opacity: opacityAnim }]}>
-        <Animated.View style={[styles.card, { transform: [{ scale: scaleAnim }] }]}>
-          <View style={styles.cardDecor} />
+      <View style={styles.backdrop}>
+        <Animated.View style={[styles.overlay, { opacity: opacityAnim }]}>
+          <Animated.View style={[styles.card, { transform: [{ scale: scaleAnim }] }]}>
+            <View style={styles.cardDecor} />
 
-          {/* ── Idle state ── */}
-          {step === 'idle' && (
-            <>
-              <View style={styles.iconWrap}>
-                <LinearGradient colors={['#FDE8DF', '#F8D8CB']} style={styles.iconGradient}>
-                  <Text style={styles.iconEmoji}>✦</Text>
-                </LinearGradient>
-              </View>
+            {/* ── Idle state ── */}
+            {step === 'idle' && (
+              <>
+                <View style={styles.iconWrap}>
+                  <LinearGradient colors={['#FDE8DF', '#F8D8CB']} style={styles.iconGradient}>
+                    <Text style={styles.iconEmoji}>✦</Text>
+                  </LinearGradient>
+                </View>
 
-              <Text style={styles.title}>Your Memory Book</Text>
-              <Text style={styles.body}>
-                {hasEntries
-                  ? `A quiet keepsake of your pregnancy journey — ${entryCount === 1 ? '1 moment' : `${entryCount} moments`} gathered together.`
-                  : 'Your journey is just beginning. Check in with Bloom a few times and your memory book will be ready to create.'}
-              </Text>
-
-              {hasEntries && (
-                <Text style={styles.privacyNote}>
-                  Created entirely on your device.{'\n'}Nothing leaves, nothing is shared without you.
+                <Text style={styles.title}>Your Memory Book</Text>
+                <Text style={styles.body}>
+                  {hasEntries
+                    ? `A quiet keepsake of your pregnancy journey — ${entryCount === 1 ? '1 moment' : `${entryCount} moments`} gathered together.`
+                    : 'Your journey is just beginning. Check in with Bloom a few times and your memory book will be ready to create.'}
                 </Text>
-              )}
 
-              {hasEntries ? (
+                {hasEntries && (
+                  <Text style={styles.privacyNote}>
+                    Created entirely on your device.{'\n'}Nothing leaves, nothing is shared without you.
+                  </Text>
+                )}
+
+                {hasEntries ? (
+                  <TouchableOpacity
+                    style={styles.primaryBtn}
+                    onPress={handleGenerate}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.primaryBtnText}>Create memory book</Text>
+                  </TouchableOpacity>
+                ) : null}
+
+                <TouchableOpacity style={styles.ghostBtn} onPress={handleClose} activeOpacity={0.7}>
+                  <Text style={styles.ghostBtnText}>{hasEntries ? 'Not just yet' : 'Close'}</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {/* ── Generating state ── */}
+            {step === 'generating' && (
+              <>
+                <BloomLoader />
+                <Text style={styles.title}>Creating your book</Text>
+                <Text style={styles.body}>
+                  Gathering your moments into something beautiful.{'\n'}
+                  The first time may take a little longer —{'\n'}please stay with this screen.
+                </Text>
+                <Text style={styles.privacyNote}>
+                  Everything happens here, on your device.
+                </Text>
+              </>
+            )}
+
+            {/* ── Done state ── */}
+            {step === 'done' && (
+              <>
+                <View style={styles.iconWrap}>
+                  <LinearGradient colors={['#D5EDD5', '#C4E2C4']} style={styles.iconGradient}>
+                    <Text style={styles.iconEmoji}>✿</Text>
+                  </LinearGradient>
+                </View>
+                <Text style={styles.title}>Your book is ready</Text>
+                <Text style={styles.body}>
+                  {Platform.OS === 'web'
+                    ? 'Your memory book opened in a new tab. You can print or save it from your browser.'
+                    : 'Your memory book was created on this device. Use the share sheet to save, send, or print it.'}
+                </Text>
+                {Platform.OS !== 'web' && pdfUriRef.current ? (
+                  <TouchableOpacity
+                    style={styles.primaryBtn}
+                    onPress={handleShareAgain}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.primaryBtnText}>Share again</Text>
+                  </TouchableOpacity>
+                ) : null}
                 <TouchableOpacity
                   style={styles.primaryBtn}
                   onPress={handleGenerate}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.primaryBtnText}>Create memory book</Text>
+                  <Text style={styles.primaryBtnText}>Create again</Text>
                 </TouchableOpacity>
-              ) : null}
+                <TouchableOpacity style={styles.ghostBtn} onPress={handleClose} activeOpacity={0.7}>
+                  <Text style={styles.ghostBtnText}>Done</Text>
+                </TouchableOpacity>
+              </>
+            )}
 
-              <TouchableOpacity style={styles.ghostBtn} onPress={handleClose} activeOpacity={0.7}>
-                <Text style={styles.ghostBtnText}>{hasEntries ? 'Not just yet' : 'Close'}</Text>
-              </TouchableOpacity>
-            </>
-          )}
-
-          {/* ── Generating state ── */}
-          {step === 'generating' && (
-            <>
-              <BloomLoader />
-              <Text style={styles.title}>Creating your book</Text>
-              <Text style={styles.body}>
-                Gathering your moments into something beautiful.{'\n'}Just a moment...
-              </Text>
-              <Text style={styles.privacyNote}>
-                Everything happens here, on your device.
-              </Text>
-            </>
-          )}
-
-          {/* ── Done state ── */}
-          {step === 'done' && (
-            <>
-              <View style={styles.iconWrap}>
-                <LinearGradient colors={['#D5EDD5', '#C4E2C4']} style={styles.iconGradient}>
-                  <Text style={styles.iconEmoji}>✿</Text>
-                </LinearGradient>
-              </View>
-              <Text style={styles.title}>Your book is ready</Text>
-              <Text style={styles.body}>
-                Your memory book is on its way. You can save, share, or print it from the share sheet.
-              </Text>
-              <TouchableOpacity
-                style={styles.primaryBtn}
-                onPress={handleGenerate}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.primaryBtnText}>Create again</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.ghostBtn} onPress={handleClose} activeOpacity={0.7}>
-                <Text style={styles.ghostBtnText}>Done</Text>
-              </TouchableOpacity>
-            </>
-          )}
-
-          {/* ── Error state ── */}
-          {step === 'error' && (
-            <>
-              <View style={styles.iconWrap}>
-                <LinearGradient colors={['#F5CECE', '#F0B8B8']} style={styles.iconGradient}>
-                  <Text style={styles.iconEmoji}>✦</Text>
-                </LinearGradient>
-              </View>
-              <Text style={styles.title}>Something interrupted</Text>
-              <Text style={styles.body}>
-                The export didn't complete. Please try again whenever you're ready.
-              </Text>
-              <TouchableOpacity
-                style={styles.primaryBtn}
-                onPress={handleGenerate}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.primaryBtnText}>Try again</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.ghostBtn} onPress={handleClose} activeOpacity={0.7}>
-                <Text style={styles.ghostBtnText}>Not now</Text>
-              </TouchableOpacity>
-            </>
-          )}
+            {/* ── Error state ── */}
+            {step === 'error' && (
+              <>
+                <View style={styles.iconWrap}>
+                  <LinearGradient colors={['#F5CECE', '#F0B8B8']} style={styles.iconGradient}>
+                    <Text style={styles.iconEmoji}>✦</Text>
+                  </LinearGradient>
+                </View>
+                <Text style={styles.title}>Something interrupted</Text>
+                <Text style={styles.body}>
+                  The export didn't complete. Please try again whenever you're ready.
+                </Text>
+                {__DEV__ && errorMsg ? (
+                  <Text style={styles.devError}>{errorMsg}</Text>
+                ) : null}
+                <TouchableOpacity
+                  style={styles.primaryBtn}
+                  onPress={handleGenerate}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.primaryBtnText}>Try again</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.ghostBtn} onPress={handleClose} activeOpacity={0.7}>
+                  <Text style={styles.ghostBtnText}>Not now</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </Animated.View>
         </Animated.View>
-      </Animated.View>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(45,31,23,0.52)',
+  },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(45,31,23,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 28,
@@ -344,6 +448,14 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontStyle: 'italic',
     marginBottom: 24,
+  },
+  devError: {
+    fontSize: 11,
+    color: Colors.textLight,
+    fontFamily: 'Inter_400Regular',
+    textAlign: 'center',
+    marginBottom: 16,
+    opacity: 0.7,
   },
 
   primaryBtn: {

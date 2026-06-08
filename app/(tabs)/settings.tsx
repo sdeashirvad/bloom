@@ -18,7 +18,7 @@ import { AmbientOrb } from '@/components/AmbientOrb';
 import { useBloom } from '@/context/BloomContext';
 import { getTrimester } from '@/constants/emotionalContent';
 import { getReflectionCount, exportSnapshot } from '@/stores/reflectionStore';
-import ExportModal from '@/components/ExportModal';
+import ExportModal, { warmupExportModules } from '@/components/ExportModal';
 import { MemoryBookInput } from '@/utils/memoryBookHtml';
 
 const TRIMESTER_NOTES: Record<1 | 2 | 3, string> = {
@@ -225,6 +225,7 @@ export default function SettingsScreen() {
 
   async function handleExportPress() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    warmupExportModules();
     const snapshot = await exportSnapshot();
     const input: MemoryBookInput = {
       userName: user.name ?? '',
