@@ -28,8 +28,8 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#FBF7F0"
       },
-      "package": "com.bloom.app",
-      "versionCode": 5,
+      "package": "com.sdeashirvad.bloom",
+      "versionCode": 6,
       "permissions": [],
       "allowBackup": false,
       "blockedPermissions": [
