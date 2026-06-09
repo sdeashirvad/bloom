@@ -29,7 +29,7 @@
         "backgroundColor": "#FBF7F0"
       },
       "package": "com.sdeashirvad.bloom",
-      "versionCode": 6,
+      "versionCode": 7,
       "permissions": [],
       "allowBackup": false,
       "blockedPermissions": [
